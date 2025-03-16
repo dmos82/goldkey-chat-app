@@ -1,13 +1,13 @@
 {
   "files": {
-    "main.css": "/goldkey-chat-app/static/css/main.d6796a9c.css",
-    "main.js": "/goldkey-chat-app/static/js/main.e4baa946.js",
-    "index.html": "/goldkey-chat-app/index.html",
-    "main.d6796a9c.css.map": "/goldkey-chat-app/static/css/main.d6796a9c.css.map",
-    "main.e4baa946.js.map": "/goldkey-chat-app/static/js/main.e4baa946.js.map"
+    "main.css": "https://dmos82.github.io/goldkey-chat-app/static/css/main.d6796a9c.css",
+    "main.js": "https://dmos82.github.io/goldkey-chat-app/static/js/main.fc2be495.js",
+    "index.html": "https://dmos82.github.io/goldkey-chat-app/index.html",
+    "main.d6796a9c.css.map": "https://dmos82.github.io/goldkey-chat-app/static/css/main.d6796a9c.css.map",
+    "main.fc2be495.js.map": "https://dmos82.github.io/goldkey-chat-app/static/js/main.fc2be495.js.map"
   },
   "entrypoints": [
     "static/css/main.d6796a9c.css",
-    "static/js/main.e4baa946.js"
+    "static/js/main.fc2be495.js"
   ]
 }
