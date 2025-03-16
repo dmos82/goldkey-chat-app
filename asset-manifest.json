@@ -1,0 +1,13 @@
+{
+  "files": {
+    "main.css": "/goldkey-chat-app/static/css/main.d6796a9c.css",
+    "main.js": "/goldkey-chat-app/static/js/main.e4baa946.js",
+    "index.html": "/goldkey-chat-app/index.html",
+    "main.d6796a9c.css.map": "/goldkey-chat-app/static/css/main.d6796a9c.css.map",
+    "main.e4baa946.js.map": "/goldkey-chat-app/static/js/main.e4baa946.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.d6796a9c.css",
+    "static/js/main.e4baa946.js"
+  ]
+}
