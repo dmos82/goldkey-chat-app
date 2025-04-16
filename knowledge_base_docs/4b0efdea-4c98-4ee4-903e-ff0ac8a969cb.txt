@@ -1,0 +1,63 @@
+New Business
+
+Send commercial Application to the client to fill or if the request is urgent, ask
+
+information from client and fill the application
+
+Send the application to the appropriate insurance companies
+
+If company have any additional questions, provide the information
+
+Receive the quote from the company
+
+Email to client for review and signature
+
+Create the account in EPIC
+
+Send binding confirmation to the insurance company
+
+Make manual binder and send to the client as the policy documents are awaited.
+
+Collect the premium form client
+
+Attach all correspondence with Client and companies in EPIC account
+
+Once policy is received, add the policy in EPIC
+
+Post new business transaction in EPIC
+
+Attach the policy in EPIC
+
+Email policy to client
+
+Endorsement
+
+Send email to company for endorsement
+
+Make binder manually and send to the client
+
+Once endorsement document received, add endorsement of Policy in EPIC
+
+Transact the endorsement in EPIC
+
+Collect payment/refund payment to the client
+
+Email the endorsement document to the client
+
+Cancellation :
+
+Get clients signature on the cancellation form
+
+Send the form to the insurance company by email
+
+After receiving the cancellation document from the insurance company, cancel the
+policy in EPIC policy shell
+
+Post the cancellation transaction
+
+Send the cancellation document to the client
+
+Refund the money to the client
+
+Inactive the account if there is no other active policy
+

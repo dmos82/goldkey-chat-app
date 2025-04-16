@@ -1,0 +1,18 @@
+# Commercial Insurance New Business Workflow
+
+Here are the exact steps for handling Commercial New Business at Gold Key Insurance:
+
+1. Send commercial Application to the client
+2. Send the application to insurance companies
+3. Provide additional information if requested
+4. Receive quote from company
+5. Email client for review and signature
+6. Create account in EPIC
+7. Send binding confirmation
+8. Make manual binder for client
+9. Collect premium payment
+10. Document all correspondence
+11. Add policy in EPIC when received
+12. Post new business transaction
+13. Attach policy documentation
+14. Email policy to client

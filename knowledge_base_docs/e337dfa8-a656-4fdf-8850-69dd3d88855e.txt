@@ -1,0 +1,137 @@
+# Insurance Workflow Guide
+
+## Common Insurance Workflows
+
+### Commercial Insurance Workflow
+The GK Commercial Workflow document outlines the following process:
+
+1. **Client Acquisition**
+   - Initial client meeting
+   - Business needs assessment
+   - Risk evaluation
+
+2. **Policy Development**
+   - Coverage assessment
+   - Premium calculation
+   - Proposal creation
+
+3. **Underwriting Process**
+   - Risk classification
+   - Policy customization
+   - Terms and conditions development
+
+4. **Policy Implementation**
+   - Document preparation
+   - Client review and signing
+   - Payment processing
+
+5. **Account Management**
+   - Regular policy reviews
+   - Claims assistance
+   - Renewal preparation
+
+### Personal Lines ADMIN Workflow
+The GK Personal Lines ADMIN Workflow document provides guidance for administrative processes:
+
+1. **Customer Data Management**
+   - Client file creation
+   - Document indexing
+   - Information verification
+
+2. **Policy Administration**
+   - Policy issuance
+   - Endorsement processing
+   - Cancellation handling
+
+3. **Payment Processing**
+   - Premium collection
+   - Payment recording
+   - Past-due follow-up
+
+4. **Document Management**
+   - Filing systems
+   - Record retention
+   - Document retrieval
+
+5. **Compliance Monitoring**
+   - Regulatory updates
+   - Audit preparation
+   - Compliance reporting
+
+### Personal Lines EPIC Workflow
+The GK Personal Lines EPIC Workflow document details the electronic policy issuance and management system:
+
+1. **System Access**
+   - User authentication
+   - Role-based permissions
+   - System navigation
+
+2. **Electronic Application Processing**
+   - Data entry guidelines
+   - Application review
+   - Submission protocols
+
+3. **Digital Underwriting**
+   - Automated risk assessment
+   - Manual override procedures
+   - Decision documentation
+
+4. **Electronic Policy Delivery**
+   - E-signature process
+   - Digital document delivery
+   - Confirmation tracking
+
+5. **Electronic Claims Management**
+   - Online claim submission
+   - Claim status tracking
+   - Digital documentation
+
+## Front Desk Workflow
+
+The front desk serves as the primary point of contact for clients and plays a crucial role in workflow management.
+
+### Daily Front Desk Procedures
+
+1. **Opening Procedures**
+   - System startup
+   - Daily schedule review
+   - Mail processing
+
+2. **Client Interaction**
+   - Greeting protocol
+   - Inquiry handling
+   - Appointment scheduling
+
+3. **Document Handling**
+   - Mail sorting
+   - Document scanning
+   - Distribution to departments
+
+4. **Payment Processing**
+   - Receipt issuance
+   - Payment recording
+   - Deposit preparation
+
+5. **Closing Procedures**
+   - System shutdown
+   - Daily report generation
+   - Office security check 
+
+## Detailed Commercial Insurance New Business Workflow Steps
+
+The exact steps for processing a new Commercial Insurance business at Gold Key are:
+
+1. Send commercial Application to the client
+2. Send the application to insurance companies
+3. Provide additional information if requested
+4. Receive quote from company
+5. Email client for review and signature
+6. Create account in EPIC
+7. Send binding confirmation
+8. Make manual binder for client
+9. Collect premium payment
+10. Document all correspondence
+11. Add policy in EPIC when received
+12. Post new business transaction
+13. Attach policy documentation
+14. Email policy to client

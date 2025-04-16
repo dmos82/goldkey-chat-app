@@ -1,0 +1,39 @@
+# GKCHATTY Test Document
+
+This is a test document for the GKCHATTY RAG (Retrieval-Augmented Generation) system. This document contains some factual information that can be used to test the retrieval and generation capabilities.
+
+## Interesting Facts
+
+The speed of light in a vacuum is approximately 299,792,458 meters per second.
+
+The Earth's circumference at the equator is about 40,075 kilometers.
+
+Water freezes at 0 degrees Celsius and boils at 100 degrees Celsius at standard atmospheric pressure.
+
+The tallest mountain on Earth is Mount Everest, with a height of 8,849 meters above sea level.
+
+The human body contains approximately 37.2 trillion cells.
+
+## Programming Information
+
+JavaScript is a high-level, interpreted programming language that conforms to the ECMAScript specification.
+
+Python is known for its readability and uses significant whitespace to delimit code blocks.
+
+TypeScript is a superset of JavaScript that adds static typing to the language.
+
+React is a JavaScript library for building user interfaces, particularly single-page applications.
+
+Node.js is a JavaScript runtime built on Chrome's V8 JavaScript engine, allowing JavaScript to run on the server side.
+
+## Historical Events
+
+The Declaration of Independence was signed on July 4, 1776.
+
+The first successful powered airplane flight was conducted by the Wright brothers on December 17, 1903.
+
+The first human to walk on the moon was Neil Armstrong on July 20, 1969, as part of the Apollo 11 mission.
+
+The World Wide Web was invented by Tim Berners-Lee in 1989 while working at CERN.
+
+The first email was sent by Ray Tomlinson in 1971, using the @ symbol to designate the recipient's location. 

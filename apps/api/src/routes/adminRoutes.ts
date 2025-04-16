@@ -1,0 +1,391 @@
+import express, { Request, Response, Router } from 'express';
+import mongoose from 'mongoose';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs/promises';
+import { v4 as uuidv4 } from 'uuid';
+import { protect, isAdmin, checkSession } from '../middleware/authMiddleware';
+import { UserDocument, IUserDocument } from '../models/UserDocument';
+import User from '../models/UserModel';
+import bcrypt from 'bcryptjs';
+// --- Import Utilities ---
+// Remove the entire block importing from chromaService (lines 12-17)
+// import { 
+//     getSystemKbCollection, 
+//     addDocuments as addEmbeddingsToCollection, 
+//     deleteDocumentChunksByDocId, 
+//     COLLECTIONS
+// } from '../utils/chromaService';
+import { generateEmbeddings } from '../utils/openaiHelper';
+import { extractPdfTextWithPages, chunkTextWithPages } from '../utils/pdfUtils'; // Reusing utils
+// Import Pinecone service functions
+import { upsertVectors, deleteVectorsByFilter, PineconeVector } from '../utils/pineconeService';
+
+const router: Router = express.Router();
+
+// Setup Multer for temporary file storage during upload
+const TEMP_UPLOAD_DIR = path.resolve(__dirname, '../../../../temp_uploads'); // Ensure this dir exists
+const KNOWLEDGE_BASE_DIR = path.resolve(__dirname, '../../../../knowledge_base_docs'); // Permanent storage
+
+// Ensure directories exist on startup
+fs.mkdir(TEMP_UPLOAD_DIR, { recursive: true }).catch(err => console.error('Failed to create temp upload directory on startup:', err));
+fs.mkdir(KNOWLEDGE_BASE_DIR, { recursive: true }).catch(err => console.error('Failed to create knowledge base directory on startup:', err));
+
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        const uploadPath = path.join(TEMP_UPLOAD_DIR, 'temp_admin_uploads');
+        fs.mkdir(uploadPath, { recursive: true }).then(() => cb(null, uploadPath)).catch(err => cb(err, uploadPath));
+    },
+    filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        const extension = path.extname(file.originalname);
+        cb(null, uniqueSuffix + extension);
+    }
+});
+
+const fileFilter = (req: Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+    // Accept only specific file types
+    const allowedMimes = ['application/pdf', 'text/plain', 'text/markdown'];
+    if (allowedMimes.includes(file.mimetype)) {
+        cb(null, true);
+    } else {
+        // Pass the error message through the request object
+        (req as any).fileFilterError = `Invalid file type: ${file.mimetype}. Only PDF, TXT, MD allowed for System KB.`;
+        cb(null, false);
+    }
+};
+
+const upload = multer({
+    storage: storage,
+    fileFilter: fileFilter,
+    limits: { fileSize: 1024 * 1024 * 50 } // 50MB limit
+});
+
+// Apply protect, checkSession, and isAdmin middleware to all admin routes
+router.use(protect, checkSession, isAdmin);
+
+// --- GET List System KB Documents --- 
+router.get('/system-kb/documents', async (req: Request, res: Response): Promise<void | Response> => {
+    console.log('[Admin Routes] Request received for listing System KB documents.');
+    try {
+        const systemDocs = await UserDocument.find({ sourceType: 'system' })
+            .select('_id originalFileName uploadTimestamp fileSize mimeType status')
+            .sort({ uploadTimestamp: -1 });
+        console.log(`[Admin Routes] Found ${systemDocs.length} System KB documents.`);
+        return res.status(200).json({ success: true, documents: systemDocs });
+    } catch (error) {
+        console.error('[Admin Routes] Error fetching System KB documents:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error fetching System KB documents.',
+            error: error instanceof Error ? error.message : String(error)
+        });
+    }
+});
+
+/**
+ * @route   POST /api/admin/system-kb/upload
+ * @desc    Upload a document to the System Knowledge Base
+ * @access  Private (Admin only)
+ */
+router.post('/system-kb/upload', upload.single('file'), async (req: Request, res: Response): Promise<void | Response> => {
+    if ((req as any).fileFilterError) {
+        return res.status(400).json({ success: false, message: (req as any).fileFilterError });
+    }
+    if (!req.file) {
+        return res.status(400).json({ success: false, message: 'No file uploaded.' });
+    }
+
+    const file = req.file;
+    const originalFileName = file.originalname;
+    const savedFileName = file.filename; // Unique name from multer
+    const tempFilePath = file.path;
+    let fileText = '';
+    let documentId: string | null = null; // To store the MongoDB ID
+
+    console.log(`[Admin Upload] Received System KB file: ${originalFileName}, type: ${file.mimetype}`);
+
+    try {
+        // 1. Read file content
+        const fileBuffer = await fs.readFile(tempFilePath);
+        if (file.mimetype === 'application/pdf') {
+            // Using the same PDF util as documentRoutes
+            const pageTexts = await extractPdfTextWithPages(fileBuffer);
+            fileText = pageTexts.map(pt => pt.text).join('\n\n');
+        } else { // txt, md
+            fileText = fileBuffer.toString('utf-8');
+        }
+        console.log(`[Admin Upload] Extracted text from ${originalFileName}. Length: ${fileText.length}`);
+
+        // 2. Chunk the text (Simple strategy)
+        const chunkSize = 1000;
+        const chunkOverlap = 200;
+        const textChunks: string[] = [];
+        for (let i = 0; i < fileText.length; i += chunkSize - chunkOverlap) {
+             const chunk = fileText.substring(i, i + chunkSize);
+             if (chunk.trim().length > 0) { textChunks.push(chunk); }
+        }
+        console.log(`[Admin Upload] Chunked ${originalFileName} into ${textChunks.length} chunks.`);
+        if (textChunks.length === 0) throw new Error("File chunking resulted in zero chunks.");
+
+        // 3. Save document metadata to MongoDB (SourceType: system)
+        const newDocument = new UserDocument({
+            // No userId for system documents
+            fileName: savedFileName, // Store unique name
+            originalFileName: originalFileName,
+            totalChunks: textChunks.length,
+            fileSize: file.size,
+            mimeType: file.mimetype,
+            sourceType: 'system', // Mark as system document
+            status: 'processing'
+        });
+        await newDocument.save();
+        // Ensure _id exists before proceeding
+        if (!newDocument?._id) throw new Error("Failed to save System KB document metadata or retrieve ID.");
+        documentId = (newDocument._id as mongoose.Types.ObjectId).toString();
+        console.log(`[Admin Upload] Saved System KB doc metadata to DB. ID: ${documentId}`);
+
+        // 4. Generate embeddings
+        console.log(`[Admin Upload] Generating ${textChunks.length} embeddings for doc ${documentId}...`);
+        const embeddings = await generateEmbeddings(textChunks);
+        console.log(`[Admin Upload] Generated ${embeddings.length} embeddings.`);
+        if (embeddings.length !== textChunks.length) {
+             throw new Error(`Embedding count (${embeddings.length}) doesn't match chunk count (${textChunks.length})`);
+        }
+
+        // 5. Prepare vectors for Pinecone (SourceType: system, no userId)
+        const vectors: PineconeVector[] = textChunks.map((chunkText, index) => ({
+            id: `${documentId}_chunk_${index}`, // Unique vector ID
+            values: embeddings[index],
+            metadata: {
+                documentId: documentId!,
+                originalFileName: originalFileName,
+                chunkIndex: index,
+                text: chunkText,
+                sourceType: 'system' // Mark source type in metadata
+                // No userId metadata for system docs
+            }
+        }));
+
+        // 6. Upsert vectors to Pinecone
+        console.log(`[Admin Upload] Upserting ${vectors.length} vectors to Pinecone for System KB doc ${documentId}...`);
+        // Assuming system/user docs share the same index, differentiated by metadata
+        await upsertVectors(vectors);
+        console.log(`[Admin Upload] Successfully upserted System KB vectors for doc ${documentId}.`);
+
+        // 7. Update document status in MongoDB
+        await UserDocument.findByIdAndUpdate(documentId, { status: 'completed' });
+        console.log(`[Admin Upload] Updated System KB doc ${documentId} status to 'completed'.`);
+
+        // 8. Clean up temporary file
+        await fs.unlink(tempFilePath);
+        console.log(`[Admin Upload] Deleted temporary file: ${tempFilePath}`);
+
+        return res.status(201).json({
+            success: true,
+            message: `System KB document '${originalFileName}' uploaded and processed successfully.`,
+            documentId: documentId,
+            chunksProcessed: textChunks.length
+        });
+
+    } catch (error: any) {
+        console.error(`[Admin Upload] Error processing System KB file ${originalFileName}:`, error);
+        if (tempFilePath) { // Attempt cleanup on error
+            await fs.unlink(tempFilePath).catch(err => console.error("[Admin Upload] Error deleting temp file during error handling:", err));
+        }
+        if (documentId) { // Attempt to mark DB entry as failed
+             await UserDocument.findByIdAndUpdate(documentId, { status: 'failed', errorMessage: error.message }).catch(err => console.error("[Admin Upload] Error updating document status to failed:", err));
+        }
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to process System KB document.',
+            error: error.message || String(error)
+        });
+    }
+});
+
+// --- DELETE System KB Document --- 
+router.delete('/system-kb/documents/:id', async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const adminUserId = req.user?._id; // ID of the admin performing the action
+
+    console.log(`[Admin Delete] Request to delete System KB document ${id} by admin ${adminUserId}`);
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+        return res.status(400).json({ success: false, message: 'Invalid document ID format.' });
+    }
+
+    try {
+        // 1. Find the document to ensure it's a system document
+        const document = await UserDocument.findById(id);
+
+        if (!document) {
+            console.warn(`[Admin Delete] System KB document ${id} not found.`);
+            return res.status(404).json({ success: false, message: 'System KB document not found.' });
+        }
+
+        // Optional: Add an extra check for sourceType if needed
+        if (document.sourceType !== 'system') {
+             console.warn(`[Admin Delete] Document ${id} is not a System KB document (type: ${document.sourceType}).`);
+            return res.status(400).json({ success: false, message: 'Invalid operation: Document is not a System KB document.' });
+        }
+
+        // 2. Delete vectors from Pinecone using the document ID
+        console.log(`[Admin Delete] Deleting vectors from Pinecone for System KB document ID: ${id}`);
+        try {
+            // Using the same filter pattern as user docs
+            await deleteVectorsByFilter({ documentId: id }); 
+            console.log(`[Admin Delete] Pinecone vector deletion initiated for System KB document ID: ${id}.`);
+        } catch (pineconeError: any) {
+            // Log the error but proceed with DB deletion
+            console.error(`[Admin Delete] Error deleting vectors from Pinecone for System KB doc ${id} (continuing DB delete):`, pineconeError);
+        }
+
+        // 3. Delete the document metadata from MongoDB
+        console.log(`[Admin Delete] Deleting System KB document metadata from MongoDB for ID: ${id}`);
+        await UserDocument.findByIdAndDelete(id);
+        console.log(`[Admin Delete] Successfully deleted System KB document metadata from MongoDB for ID: ${id}`);
+
+        // 4. Optional: Delete the actual file from storage if applicable
+        //    System KB files might be managed differently (e.g., git LFS, separate store)
+        //    If they are stored similarly to user uploads (using document.fileName):
+        /*
+        if (document.fileName) { 
+             const filePath = path.join(SOME_SYSTEM_KB_STORAGE_PATH, document.fileName);
+             try {
+                 await fs.unlink(filePath);
+                 console.log(`[Admin Delete] Deleted stored System KB file: ${filePath}`);
+             } catch (unlinkError: any) {
+                 if (unlinkError.code !== 'ENOENT') { 
+                     console.error(`[Admin Delete] Error deleting stored file ${filePath}:`, unlinkError);
+                 }
+             }
+        }
+        */
+
+        return res.status(200).json({ success: true, message: 'System KB document deleted successfully.' });
+
+    } catch (error: any) {
+        console.error(`[Admin Delete] Error deleting System KB document ${id}:`, error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error deleting System KB document.',
+            error: error.message || String(error)
+        });
+    }
+});
+
+// ================================================
+//          USER MANAGEMENT ROUTES
+// ================================================
+
+// --- GET List All Users (Admin) ---
+/**
+ * @route   GET /api/admin/users
+ * @desc    Get a list of all users (excluding passwords)
+ * @access  Private (Admin only)
+ */
+router.get('/users', async (req: Request, res: Response) => {
+    console.log('[Admin Users] Request received for listing users.');
+    try {
+        const users = await User.find({}).select('-password');
+        console.log(`[Admin Users] Found ${users.length} users.`);
+        res.status(200).json({ success: true, users: users });
+    } catch (error: any) {
+        console.error('[Admin Users] Error fetching users:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error fetching user list.',
+            error: error.message || String(error)
+        });
+    }
+});
+
+// --- DELETE User (Admin) ---
+/**
+ * @route   DELETE /api/admin/users/:userId
+ * @desc    Delete a user account
+ * @access  Private (Admin only)
+ */
+router.delete('/users/:userId', protect, checkSession, isAdmin, async (req: Request, res: Response) => {
+    const userIdToDelete = req.params.userId;
+    const adminUserId = req.user?._id;
+
+    console.log(`[Admin Users] Request to delete user ${userIdToDelete} by admin ${adminUserId}`);
+
+    // Basic validation
+    if (!mongoose.Types.ObjectId.isValid(userIdToDelete)) {
+        return res.status(400).json({ success: false, message: 'Invalid user ID format.' });
+    }
+    if (adminUserId && adminUserId.toString() === userIdToDelete) {
+        return res.status(400).json({ success: false, message: 'Admin cannot delete their own account.' });
+    }
+
+    try {
+        const result = await User.deleteOne({ _id: userIdToDelete });
+        if (result.deletedCount === 0) {
+            return res.status(404).json({ success: false, message: 'User not found.' });
+        }
+        console.log(`[Admin Users] User ${userIdToDelete} deleted successfully.`);
+        res.status(200).json({ success: true, message: 'User deleted successfully.' });
+    } catch (error: any) {
+        console.error(`[Admin Users] Error deleting user ${userIdToDelete}:`, error);
+        res.status(500).json({ success: false, message: 'Error deleting user.', error: error.message });
+    }
+});
+
+// --- PUT Change User Password (Admin) ---
+/**
+ * @route   PUT /api/admin/users/:userId/password
+ * @desc    Change a specific user's password
+ * @access  Private (Admin only)
+ */
+router.put('/users/:userId/password', protect, checkSession, isAdmin, async (req: Request, res: Response) => {
+    const userIdToUpdate = req.params.userId;
+    const { newPassword } = req.body;
+    
+    console.log(`[Admin Users] Request to change password for user ${userIdToUpdate}`);
+
+    // Basic validation
+    if (!mongoose.Types.ObjectId.isValid(userIdToUpdate)) {
+        return res.status(400).json({ success: false, message: 'Invalid user ID format.' });
+    }
+    if (!newPassword || typeof newPassword !== 'string' || newPassword.length < 6) {
+        return res.status(400).json({ success: false, message: 'New password must be at least 6 characters long.' });
+    }
+
+    try {
+        const user = await User.findById(userIdToUpdate);
+        if (!user) {
+            return res.status(404).json({ success: false, message: 'User not found.' });
+        }
+        user.password = await bcrypt.hash(newPassword, 10); // Hashing cost factor: 10
+        await user.save();
+        console.log(`[Admin Users] Password updated for user ${userIdToUpdate}`);
+        res.status(200).json({ success: true, message: 'User password updated successfully.' });
+    } catch (error: any) {
+        console.error(`[Admin Users] Error updating password for user ${userIdToUpdate}:`, error);
+        res.status(500).json({ success: false, message: 'Error updating user password.', error: error.message });
+    }
+});
+
+// --- POST Create User (Admin) --- Needs implementation or use controller if exists
+// Ensure this uses an inline handler or a CORRECTLY imported controller
+router.post('/users', async (req, res) => {
+    // Example: Logic for creating a user
+    res.status(501).json({ message: "Create user endpoint not fully implemented" });
+});
+
+// --- PUT Update User Role (Admin) --- Needs implementation or use controller if exists
+router.put('/users/:userId/role', async (req, res) => {
+    // Example: Logic for updating user role
+    res.status(501).json({ message: "Update user role endpoint not fully implemented" });
+});
+
+// --- GET User By ID (Admin) --- Needs implementation or use controller if exists
+router.get('/users/:userId', async (req, res) => {
+    // Example: Logic for getting user by ID
+    res.status(501).json({ message: "Get user by ID endpoint not fully implemented" });
+});
+
+export default router; 

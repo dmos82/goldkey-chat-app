@@ -1,0 +1,99 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /* Remove direct color application to html */
+  /* html {
+    font-family: theme('fontFamily.sans', 'sans-serif');
+    font-size: theme('fontSize.base', '13px');
+    color: theme('colors.foreground-light');
+    background-color: theme('colors.background-light');
+    scrollbar-color: theme('colors.border-light') theme('colors.background-light');
+    scrollbar-width: thin;
+  }
+
+  html.dark {
+    color: theme('colors.foreground-dark');
+    background-color: theme('colors.background-dark');
+    scrollbar-color: theme('colors.border-dark') theme('colors.background-dark');
+  } */
+
+  body, #__next {
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  .animate-fadeInUp {
+    animation: fadeInUp 0.3s ease-out;
+  }
+
+  /* Keep Shadcn CSS variable definitions */
+  :root {
+    /* Mockup v10 Light Theme -> Shadcn Variables */
+    --background: 210 40% 98%; /* slate-50 (#f8fafc) */
+    --foreground: 215 28% 17%; /* slate-800 (#1e293b) */
+    --card: 0 0% 100%;         /* white (#ffffff) */
+    --card-foreground: 215 28% 17%; /* slate-800 (#1e293b) */
+    --popover: 0 0% 100%;        /* white (#ffffff) */
+    --popover-foreground: 215 28% 17%; /* slate-800 (#1e293b) */
+    --primary: 43 99% 48%;         /* gold (#f5b301) */
+    --primary-foreground: 215 39% 31%; /* dk-gray-800 (#1f2937) - text on gold */
+    --secondary: 215 20% 97%;        /* slate-100 (#f1f5f9) */
+    --secondary-foreground: 215 16% 47%; /* slate-600 (#475569) */
+    --muted: 215 20% 97%;            /* secondary (#f1f5f9) */
+    --muted-foreground: 215 16% 47%;     /* secondary-foreground (#475569) */
+    --accent: 43 99% 48%;             /* primary (#f5b301) */
+    --accent-foreground: 215 39% 31%;    /* primary-foreground (#1f2937) */
+    --destructive: 0 84.2% 60.2%;     /* Default Red */
+    --destructive-foreground: 210 40% 98%; /* Default Red Foreground */
+    --border: 215 20% 91%;           /* slate-200 (#e2e8f0) */
+    --input: 215 19% 81%;            /* slate-300 (#cbd5e1) */
+    --ring: 43 99% 48%;              /* primary (#f5b301) - For focus rings */
+
+    --radius: 0.5rem; /* Keep or adjust border radius as needed */
+  }
+  .dark {
+    /* Mockup v10 Dark Theme -> Shadcn Variables */
+    --background: 220 4% 13%;   /* dk-gray (#202124) */
+    --foreground: 220 8% 93%;   /* lt-gray (#e8eaed) */
+    --card: 220 4% 20%;         /* med-gray (#303134) */
+    --card-foreground: 220 8% 93%;   /* lt-gray (#e8eaed) */
+    --popover: 220 4% 20%;        /* med-gray (#303134) */
+    --popover-foreground: 220 8% 93%;   /* lt-gray (#e8eaed) */
+    --primary: 43 99% 48%;         /* gold (#f5b301) */
+    --primary-foreground: 0 0% 100%; /* white - text on gold */
+    --secondary: 210 4% 25%;        /* lighter-dk-gray (#3c4043) */
+    --secondary-foreground: 210 7% 76%; /* med-lt-gray (#bdc1c6) */
+    --muted: 210 4% 25%;            /* secondary (#3c4043) */
+    --muted-foreground: 210 7% 76%;     /* secondary-foreground (#bdc1c6) */
+    --accent: 43 99% 48%;             /* primary (#f5b301) */
+    --accent-foreground: 0 0% 100%;    /* primary-foreground (white) */
+    --destructive: 0 62.8% 30.6%;     /* Default Dark Red */
+    --destructive-foreground: 210 40% 98%; /* Default Dark Red Foreground */
+    --border: 214 4% 38%;           /* gray-border (#5f6368) */
+    --input: 212 4% 52%;            /* lighter-gray-border (#80868b) */
+    --ring: 43 99% 48%;              /* primary (#f5b301) - For focus rings */
+  }
+}
+
+/* Remove redundant @theme block if not needed */
+/* @theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+} */
+
+/* Keep the base application of border, bg, text */
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    /* Ensure font-family and font-size are set */
+    font-family: theme('fontFamily.sans', 'sans-serif');
+    font-size: theme('fontSize.base', '13px');
+  }
+}

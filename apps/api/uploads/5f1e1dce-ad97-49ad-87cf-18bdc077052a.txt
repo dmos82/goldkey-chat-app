@@ -1,0 +1,542 @@
+{
+  "name": "R25 | The Ultimate Publishing Agent (Template)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "triggerInterval": {
+            "unit": "days",
+            "quantity": 1
+          },
+          "time": {
+            "hour": 0,
+            "minute": 0
+          }
+        }
+      },
+      "id": "9bbdf106-d6d2-495b-9734-c8e68e9a92d4",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        440,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": "YOUR_GOOGLE_SHEET_ID",
+        "sheetName": "={{ $parameter.itemData.sheet || 'Sheet1' }}",
+        "filters": {
+          "filters": [
+            {
+              "fieldKey": "publishing",
+              "value": "for publishing"
+            }
+          ]
+        },
+        "options": {
+          "returnOnlyFirstMatchingRow": true
+        }
+      },
+      "id": "3d04d657-e2fa-4435-8f7d-869fec47524d",
+      "name": "Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        640,
+        400
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_GOOGLE_SHEETS_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "json",
+        "jsonData": "=\n{\n  \"instagram\": \"YOUR_INSTAGRAM_ACCOUNT_ID\", \n  \"youtube\": \"YOUR_YOUTUBE_ACCOUNT_ID\",\n  \"tiktok\": \"YOUR_TIKTOK_ACCOUNT_ID\",\n  \"facebook\": \"YOUR_FACEBOOK_ACCOUNT_ID\",\n  \"facebook_page_id\": \"YOUR_FACEBOOK_PAGE_ID\",\n  \"threads\": \"YOUR_THREADS_ACCOUNT_ID\",\n  \"twitter\": \"YOUR_TWITTER_ACCOUNT_ID\",\n  \"linkedin\": \"YOUR_LINKEDIN_ACCOUNT_ID\",\n  \"pinterest\": \"YOUR_PINTEREST_ACCOUNT_ID\",\n  \"pinterest_board_id\": \"YOUR_PINTEREST_BOARD_ID\",\n  \"bluesky\": \"YOUR_BLUESKY_ACCOUNT_ID\"\n}"
+      },
+      "id": "4f52ebf3-72e5-4194-8c33-44df8889f348",
+      "name": "Set Blotato IDs",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 2.3,
+      "position": [
+        840,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://backend.blotato.com/v2/media",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "blotato-api-key",
+              "value": "={{ $credentials.httpHeaderAuth.apiToken }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "url",
+              "value": "={{ $('Google Sheets').item.json.final_output }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a6a1b851-03ef-478d-9c00-a8dd18f5a4d0",
+      "name": "Ready Video in Blotato",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1040,
+        400
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "YOUR_BLOTATO_HEADER_CREDENTIAL_ID",
+          "name": "Blotato API Key Header"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://backend.blotato.com/v2/posts",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "blotato-api-key",
+              "value": "={{ $credentials.httpHeaderAuth.apiToken }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "=\n{\n  \"post\": {\n    \"target\": {\n      \"targetType\": \"youtube\"\n    },\n    \"content\": {\n        \"title\": \"{{ $('Google Sheets').item.json.idea || 'Default Title' }}\",\n        \"privacyStatus\": \"unlisted\", \n        \"text\": \"{{ $('Google Sheets').item.json.caption }}\",\n        \"platform\": \"youtube\",\n        \"mediaUrls\": [\"{{ $('Ready Video in Blotato').item.json.url }}\"]\n    },\n    \"accountId\": \"{{ $('Set Blotato IDs').item.json.youtube }}\"\n  }\n}",
+        "options": {}
+      },
+      "id": "1ec8d4f8-70c6-4187-8533-35f4b8023c9e",
+      "name": "YOUTUBE",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1300,
+        160
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "YOUR_BLOTATO_HEADER_CREDENTIAL_ID",
+          "name": "Blotato API Key Header"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://backend.blotato.com/v2/posts",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "blotato-api-key",
+              "value": "={{ $credentials.httpHeaderAuth.apiToken }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "=\n{\n  \"post\": {\n    \"target\": {\n      \"targetType\": \"instagram\"\n    },\n    \"content\": {\n        \"text\": \"{{ $('Google Sheets').item.json.caption }}\",\n        \"platform\": \"instagram\",\n        \"mediaUrls\": [\"{{ $('Ready Video in Blotato').item.json.url }}\"]\n    },\n    \"accountId\": \"{{ $('Set Blotato IDs').item.json.instagram }}\"\n  }\n}",
+        "options": {}
+      },
+      "id": "1d1d8670-d01e-44d2-8833-e9157b11732a",
+      "name": "INSTAGRAM",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1500,
+        160
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "YOUR_BLOTATO_HEADER_CREDENTIAL_ID",
+          "name": "Blotato API Key Header"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://backend.blotato.com/v2/posts",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "blotato-api-key",
+              "value": "={{ $credentials.httpHeaderAuth.apiToken }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "=\n{\n  \"post\": {\n    \"target\": {\n        \"targetType\": \"tiktok\",\n        \"isYourBrand\": false,\n        \"disabledDuet\": false,\n        \"privacyLevel\": \"PUBLIC_TO_EVERYONE\",\n        \"isAiGenerated\": true,\n        \"disableStitch\": false,\n        \"disabledComments\": false,\n        \"isBrandedContent\": false\n    },\n    \"content\": {\n        \"text\": \"{{ $('Google Sheets').item.json.caption }}\",\n        \"platform\": \"tiktok\",\n        \"mediaUrls\": [\"{{ $('Ready Video in Blotato').item.json.url }}\"]\n    },\n    \"accountId\": \"{{ $('Set Blotato IDs').item.json.tiktok }}\"\n  }\n}",
+        "options": {}
+      },
+      "id": "d637de2f-51e5-4148-8b5f-1ae695a09104",
+      "name": "TIKTOK",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1700,
+        160
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "YOUR_BLOTATO_HEADER_CREDENTIAL_ID",
+          "name": "Blotato API Key Header"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://backend.blotato.com/v2/posts",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "blotato-api-key",
+              "value": "={{ $credentials.httpHeaderAuth.apiToken }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "=\n{\n  \"post\": {\n    \"target\": {\n        \"pageId\": \"{{ $('Set Blotato IDs').item.json.facebook_page_id }}\",\n        \"targetType\": \"facebook\"\n    },\n    \"content\": {\n        \"text\": \"{{ $('Google Sheets').item.json.caption }}\",\n        \"platform\": \"facebook\",\n        \"mediaUrls\": [\"{{ $('Ready Video in Blotato').item.json.url }}\"]\n    },\n    \"accountId\": \"{{ $('Set Blotato IDs').item.json.facebook }}\"\n  }\n}",
+        "options": {}
+      },
+      "id": "3dd797b6-337f-4064-8d85-1f814fa86876",
+      "name": "FACEBOOK",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1300,
+        320
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "YOUR_BLOTATO_HEADER_CREDENTIAL_ID",
+          "name": "Blotato API Key Header"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://backend.blotato.com/v2/posts",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "blotato-api-key",
+              "value": "={{ $credentials.httpHeaderAuth.apiToken }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "=\n{\n  \"post\": {\n    \"target\": {\n        \"targetType\": \"threads\"\n    },\n    \"content\": {\n        \"text\": \"{{ $('Google Sheets').item.json.caption }}\",\n        \"platform\": \"threads\",\n        \"mediaUrls\": [\"{{ $('Ready Video in Blotato').item.json.url }}\"]\n    },\n    \"accountId\": \"{{ $('Set Blotato IDs').item.json.threads }}\"\n  }\n}",
+        "options": {}
+      },
+      "id": "0a7f6461-dd4b-40ab-8927-50838f8980b3",
+      "name": "THREADS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1500,
+        320
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "YOUR_BLOTATO_HEADER_CREDENTIAL_ID",
+          "name": "Blotato API Key Header"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://backend.blotato.com/v2/posts",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "blotato-api-key",
+              "value": "={{ $credentials.httpHeaderAuth.apiToken }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "=\n{\n  \"post\": {\n    \"target\": {\n        \"targetType\": \"twitter\"\n    },\n    \"content\": {\n        \"text\": \"{{ $('Google Sheets').item.json.caption }}\",\n        \"platform\": \"twitter\",\n        \"mediaUrls\": [\"{{ $('Ready Video in Blotato').item.json.url }}\"]\n    },\n    \"accountId\": \"{{ $('Set Blotato IDs').item.json.twitter }}\"\n  }\n}",
+        "options": {}
+      },
+      "id": "4a5ed9b7-c4c5-4f5a-b6c5-f85a2b2b393d",
+      "name": "X TWITTER",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1700,
+        320
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "YOUR_BLOTATO_HEADER_CREDENTIAL_ID",
+          "name": "Blotato API Key Header"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://backend.blotato.com/v2/posts",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "blotato-api-key",
+              "value": "={{ $credentials.httpHeaderAuth.apiToken }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "=\n{\n  \"post\": {\n    \"target\": {\n        \"targetType\": \"linkedin\"\n    },\n    \"content\": {\n        \"text\": \"{{ $('Google Sheets').item.json.caption }}\",\n        \"platform\": \"linkedin\",\n        \"mediaUrls\": [\"{{ $('Ready Video in Blotato').item.json.url }}\"]\n    },\n    \"accountId\": \"{{ $('Set Blotato IDs').item.json.linkedin }}\"\n  }\n}",
+        "options": {}
+      },
+      "id": "6d2b1094-02e5-4032-8b27-3f7d886a3a78",
+      "name": "LINKEDIN",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1300,
+        480
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "YOUR_BLOTATO_HEADER_CREDENTIAL_ID",
+          "name": "Blotato API Key Header"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://backend.blotato.com/v2/posts",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "blotato-api-key",
+              "value": "={{ $credentials.httpHeaderAuth.apiToken }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "=\n{\n  \"post\": {\n    \"target\": {\n        \"targetType\": \"pinterest\",\n        \"boardId\": \"{{ $('Set Blotato IDs').item.json.pinterest_board_id }}\"\n    },\n    \"content\": {\n        \"text\": \"{{ $('Google Sheets').item.json.caption }}\",\n        \"platform\": \"pinterest\",\n        \"mediaUrls\": [\"{{ $('Ready Video in Blotato').item.json.url }}\"]\n    },\n    \"accountId\": \"{{ $('Set Blotato IDs').item.json.pinterest }}\"\n  }\n}",
+        "options": {}
+      },
+      "id": "5d0326b1-e6e5-4b6d-a3f4-b0e33c5a4c49",
+      "name": "PINTEREST",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1500,
+        480
+      ],
+      "notes": "Image and text only",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "YOUR_BLOTATO_HEADER_CREDENTIAL_ID",
+          "name": "Blotato API Key Header"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://backend.blotato.com/v2/posts",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "blotato-api-key",
+              "value": "={{ $credentials.httpHeaderAuth.apiToken }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "=\n{\n  \"post\": {\n    \"target\": {\n        \"targetType\": \"bluesky\"\n    },\n    \"content\": {\n        \"text\": \"{{ $('Google Sheets').item.json.caption }}\",\n        \"platform\": \"bluesky\",\n        \"mediaUrls\": [\"{{ $('Ready Video in Blotato').item.json.url }}\"]\n    },\n    \"accountId\": \"{{ $('Set Blotato IDs').item.json.bluesky }}\"\n  }\n}",
+        "options": {}
+      },
+      "id": "09b2c9e7-a8a9-496f-81e5-d83f9a7d1e4e",
+      "name": "BLUESKY",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1700,
+        480
+      ],
+      "notes": "Image and text only",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "YOUR_BLOTATO_HEADER_CREDENTIAL_ID",
+          "name": "Blotato API Key Header"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": "YOUR_GOOGLE_SHEET_ID",
+        "sheetName": "={{ $parameter.itemData.sheet || 'Sheet1' }}",
+        "columnToMatchOn": "id",
+        "idToMatch": "={{ $('Google Sheets').item.json.id }}",
+        "fieldsToUpdate": {
+          "values": [
+            {
+              "columnKey": "publishing",
+              "value": "done"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "47c6c235-2b08-4b70-a8f5-e68b9b3d47b3",
+      "name": "Update Gsheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        1900,
+        320
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_GOOGLE_SHEETS_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets": {
+      "main": [
+        [
+          {
+            "node": "Set Blotato IDs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Blotato IDs": {
+      "main": [
+        [
+          {
+            "node": "Ready Video in Blotato",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ready Video in Blotato": {
+      "main": [
+        [
+          {
+            "node": "YOUTUBE",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "INSTAGRAM",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "TIKTOK",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "FACEBOOK",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "THREADS",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "X TWITTER",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "LINKEDIN",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "PINTEREST",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "BLUESKY",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Update Gsheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "pinData": {},
+  "versionId": "0e5e932f-a08a-4e5d-868a-f8f3b4767a7e",
+  "triggerCount": 1,
+  "tags": []
+}

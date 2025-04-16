@@ -1,0 +1,84 @@
+# Insurance Policies
+
+## Types of Insurance Policies
+
+### Auto Insurance
+Auto insurance provides protection against losses involving your car. Standard policies typically cover:
+- Liability coverage for bodily injury and property damage to others
+- Collision coverage for damage to your vehicle in an accident
+- Comprehensive coverage for non-collision related damage (theft, vandalism, weather)
+- Medical payments coverage
+- Uninsured/underinsured motorist protection
+
+### Home Insurance
+Home insurance protects your home and personal belongings. Key coverages include:
+- Dwelling coverage for the structure of your home
+- Personal property coverage for belongings
+- Liability protection
+- Additional living expenses if displaced from your home
+
+### Life Insurance
+Life insurance provides financial security to beneficiaries after the insured's death. Main types include:
+- Term life: Coverage for a specific time period
+- Whole life: Lifetime coverage with a cash value component
+- Universal life: Flexible premiums and death benefits
+
+### Health Insurance
+Health insurance helps cover medical expenses. Common plans include:
+- Health Maintenance Organization (HMO)
+- Preferred Provider Organization (PPO)
+- Exclusive Provider Organization (EPO)
+- Point of Service (POS) plans
+
+## Insurance Workflows
+
+### Policy Acquisition Workflow
+1. Initial contact with prospect
+2. Needs assessment
+3. Quote generation
+4. Policy proposal
+5. Application submission
+6. Underwriting review
+7. Policy issuance
+8. Premium collection
+
+### Claims Processing Workflow
+1. Claim notification by insured
+2. Claim validation and assignment
+3. Investigation and evidence collection
+4. Coverage determination
+5. Damage/loss assessment
+6. Settlement negotiation
+7. Payment processing
+8. Case closure
+
+## Insurance Terms
+
+- Premium: The amount paid for insurance coverage
+- Deductible: Amount paid out-of-pocket before insurance covers a claim
+- Policy limit: Maximum amount an insurer will pay
+- Exclusion: Specific conditions or circumstances not covered
+- Rider: Additional coverage added to a standard policy
+- Underwriting: Process of evaluating risk to determine coverage and premium
+- Beneficiary: Person designated to receive policy benefits
+- Endorsement: Document that changes the terms of a policy
+
+## Front Desk Procedures
+
+The front desk at an insurance company has several key responsibilities:
+1. Greeting clients and visitors
+2. Scheduling appointments
+3. Collecting and verifying client information
+4. Accepting premium payments
+5. Distributing policy documents
+6. Answering general inquiries
+7. Directing clients to appropriate departments
+8. Maintaining office supplies and equipment
+
+Front desk staff should follow these best practices:
+- Maintain a professional appearance and demeanor
+- Ensure client confidentiality
+- Document all client interactions
+- Verify all policy information before distribution
+- Receive proper training on insurance products and services
+- Follow established protocols for handling sensitive information 

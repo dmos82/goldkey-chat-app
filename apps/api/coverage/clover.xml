@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<coverage generated="1744232136422" clover="3.2.0">
+  <project timestamp="1744232136422" name="All files">
+    <metrics statements="47" coveredstatements="45" conditionals="17" coveredconditionals="16" methods="12" coveredmethods="11" elements="76" coveredelements="72" complexity="0" loc="47" ncloc="47" packages="1" files="2" classes="2"/>
+    <file name="inMemoryStore.ts" path="/Users/davidjmorin/GKCHATTY/apps/api/src/utils/inMemoryStore.ts">
+      <metrics statements="24" coveredstatements="24" conditionals="7" coveredconditionals="6" methods="10" coveredmethods="10"/>
+      <line num="15" count="1" type="stmt"/>
+      <line num="16" count="1010" type="cond" truecount="1" falsecount="0"/>
+      <line num="17" count="1" type="stmt"/>
+      <line num="20" count="3027" type="stmt"/>
+      <line num="21" count="3027" type="stmt"/>
+      <line num="22" count="3027" type="stmt"/>
+      <line num="24" count="1009" type="cond" truecount="3" falsecount="0"/>
+      <line num="25" count="1008" type="stmt"/>
+      <line num="29" count="1" type="stmt"/>
+      <line num="30" count="1" type="stmt"/>
+      <line num="35" count="1" type="stmt"/>
+      <line num="36" count="1008" type="cond" truecount="1" falsecount="0"/>
+      <line num="38" count="1" type="stmt"/>
+      <line num="39" count="1" type="cond" truecount="1" falsecount="0"/>
+      <line num="40" count="1" type="stmt"/>
+      <line num="43" count="1008" type="stmt"/>
+      <line num="49" count="1" type="cond" truecount="0" falsecount="1"/>
+      <line num="50" count="6" type="stmt"/>
+      <line num="51" count="1007" type="stmt"/>
+      <line num="55" count="1002" type="stmt"/>
+      <line num="57" count="1006" type="stmt"/>
+      <line num="59" count="6" type="stmt"/>
+      <line num="65" count="1" type="stmt"/>
+      <line num="66" count="9" type="stmt"/>
+    </file>
+    <file name="textProcessor.ts" path="/Users/davidjmorin/GKCHATTY/apps/api/src/utils/textProcessor.ts">
+      <metrics statements="23" coveredstatements="21" conditionals="10" coveredconditionals="10" methods="2" coveredmethods="1"/>
+      <line num="12" count="1" type="cond" truecount="2" falsecount="0"/>
+      <line num="13" count="6" type="cond" truecount="3" falsecount="0"/>
+      <line num="14" count="1" type="stmt"/>
+      <line num="17" count="5" type="cond" truecount="1" falsecount="0"/>
+      <line num="18" count="1" type="stmt"/>
+      <line num="21" count="4" type="cond" truecount="1" falsecount="0"/>
+      <line num="22" count="1" type="stmt"/>
+      <line num="25" count="3" type="cond" truecount="1" falsecount="0"/>
+      <line num="26" count="1" type="stmt"/>
+      <line num="29" count="2" type="stmt"/>
+      <line num="30" count="2" type="stmt"/>
+      <line num="32" count="2" type="stmt"/>
+      <line num="33" count="7" type="stmt"/>
+      <line num="34" count="7" type="stmt"/>
+      <line num="36" count="7" type="cond" truecount="1" falsecount="0"/>
+      <line num="37" count="7" type="stmt"/>
+      <line num="41" count="7" type="stmt"/>
+      <line num="44" count="7" type="cond" truecount="1" falsecount="0"/>
+      <line num="45" count="2" type="stmt"/>
+      <line num="49" count="2" type="stmt"/>
+      <line num="58" count="1" type="stmt"/>
+      <line num="60" count="0" type="stmt"/>
+      <line num="61" count="0" type="stmt"/>
+    </file>
+  </project>
+</coverage>
