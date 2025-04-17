@@ -22,9 +22,37 @@ async function startServer() {
     console.log('Database connection successful, proceeding with app setup...');
 
     // Core Middleware
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000'; // Read from env or fallback
-    console.log(`[CORS] Allowing origin: ${frontendUrl}`); // Log the configured origin
-    app.use(cors({ origin: frontendUrl })); // Use the variable here
+    // const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000'; // Old single origin approach
+    // console.log(`[CORS] Allowing origin: ${frontendUrl}`); 
+    // app.use(cors({ origin: frontendUrl })); 
+
+    // Updated CORS Configuration
+    const allowedOrigins = [
+      'http://localhost:3000', // Local dev frontend
+      'https://goldkey-chat-demo-cli.netlify.app' // Deployed Netlify frontend
+      // Add other allowed origins if needed in the future
+    ];
+    console.log(`[CORS] Allowed Origins: ${allowedOrigins.join(', ')}`);
+
+    const corsOptions = {
+      origin: function (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
+        // Allow requests with no origin (like mobile apps or curl requests)
+        // Allow requests from allowed list
+        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+          callback(null, true);
+        } else {
+          console.error(`[CORS] Blocked origin: ${origin}`);
+          const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+          callback(new Error(msg), false);
+        }
+      },
+      credentials: true, // Allow cookies/auth headers
+      methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], // Standard methods
+      allowedHeaders: ['Content-Type', 'Authorization'], // Allow common headers
+    };
+
+    app.use(cors(corsOptions)); // Apply updated CORS options
+
     app.use(express.json()); // Parse JSON request bodies
     app.use(morgan('dev')); // Logging HTTP requests
     app.use(express.urlencoded({ extended: true })); // Body parser for URL-encoded requests
