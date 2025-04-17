@@ -53,6 +53,18 @@ async function startServer() {
 
     app.use(cors(corsOptions)); // Apply updated CORS options
 
+    // Explicitly handle OPTIONS requests (preflight) for all routes
+    // This should ideally be handled by the cors middleware, but adding explicitly 
+    // can sometimes resolve issues with specific hosting/proxy setups.
+    app.options('*', cors(corsOptions)); // Enable preflight across-the-board
+
+    // Add request logging *after* CORS, *before* JSON parsing
+    app.use((req: Request, res: Response, next: NextFunction) => {
+      const origin = req.headers.origin || 'N/A';
+      console.log(`[Request Logger] Incoming: ${req.method} ${req.originalUrl} from Origin: ${origin}`);
+      next();
+    });
+
     app.use(express.json()); // Parse JSON request bodies
     app.use(morgan('dev')); // Logging HTTP requests
     app.use(express.urlencoded({ extended: true })); // Body parser for URL-encoded requests
