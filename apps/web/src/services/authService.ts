@@ -1,5 +1,5 @@
-// TODO: Consider moving API base URL to environment variables
-const API_BASE_URL = 'http://localhost:3001/api/auth';
+// Use environment variable for API base URL
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001';
 
 interface Credentials {
   username: string;
@@ -31,7 +31,7 @@ interface AuthError {
  */
 export async function registerUser(credentials: Credentials): Promise<AuthResponse> {
   try {
-    const response = await fetch(`${API_BASE_URL}/register`, {
+    const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -67,7 +67,12 @@ export async function registerUser(credentials: Credentials): Promise<AuthRespon
  */
 export async function loginUser(credentials: Credentials): Promise<AuthResponse> {
   try {
-    const response = await fetch(`${API_BASE_URL}/login`, {
+    // Log the exact URL being used just before fetching
+    console.log(`[authService] API_BASE_URL at function start: ${API_BASE_URL}`);
+    const loginUrl = `${API_BASE_URL}/api/auth/login`;
+    console.log(`[authService] Attempting fetch to: ${loginUrl}`);
+
+    const response = await fetch(loginUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
