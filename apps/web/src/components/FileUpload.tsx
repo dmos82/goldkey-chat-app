@@ -2,6 +2,7 @@
 
 import React, { useState, ChangeEvent, FormEvent } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { API_BASE_URL } from '@/lib/config';
 
 interface FileUploadProps {
   onUploadSuccess: () => void;
@@ -45,7 +46,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUploadSuccess }) => {
       const headers: HeadersInit = {
         'Authorization': `Bearer ${token}`,
       };
-      const response = await fetch('http://localhost:3001/api/documents/upload', {
+      const response = await fetch(`${API_BASE_URL}/api/documents/upload`, {
         method: 'POST',
         headers: headers,
         body: formData,

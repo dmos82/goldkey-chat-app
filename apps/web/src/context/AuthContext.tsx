@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useRouter } from 'next/navigation'; // Import useRouter
 import { useToast } from "@/components/ui/use-toast"; // Import useToast
+import { API_BASE_URL } from '@/lib/config';
 
 // 1. Define Interfaces
 export interface AuthenticatedUser {
@@ -91,27 +92,27 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   };
 
   // Enhanced Logout function
-  const logout = async () => {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-    console.log('AuthProvider: Initiating logout...');
+  const logoutUser = async () => {
+    if (!token) return; // Should not happen if logout button is shown, but good practice
+    console.log('[AuthContext] Logging out user...');
     
     // 1. Call backend logout endpoint (optional but good practice)
     try {
-      const response = await fetch(`${apiUrl}/api/auth/logout`, {
+      const logoutResponse = await fetch(`${API_BASE_URL}/api/auth/logout`, { // Use imported constant
         method: 'POST',
         headers: {
           // Include token if needed by backend, though likely not for simple logout
           // 'Authorization': `Bearer ${token}`
         }
       });
-      if (!response.ok) {
-        console.warn('AuthProvider: Backend logout call failed', response.status);
+      if (!logoutResponse.ok) {
+        console.warn('[AuthContext] Backend logout call failed', logoutResponse.status);
         // Decide if failure here should prevent frontend logout (usually not)
       } else {
-         console.log('AuthProvider: Backend logout successful');
+         console.log('[AuthContext] Backend logout successful');
       }
     } catch (error) {
-      console.error('AuthProvider: Error calling backend logout endpoint', error);
+      console.error('[AuthContext] Error calling backend logout endpoint', error);
     }
 
     // 2. Clear local storage and context state (always do this)
@@ -154,7 +155,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
           variant: 'destructive',
           duration: 7000
         });
-        logout(); // Call the existing logout function
+        logoutUser(); // Call the existing logout function
         return true; // Indicate that the error was handled
       } else {
         // Handle generic 401 (Unauthorized)
@@ -164,7 +165,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
             description: "Your session may have expired. Please log in again.",
             variant: "destructive"
         });
-        logout();
+        logoutUser();
         return true; // Indicate that the error was handled
       }
     }
@@ -178,7 +179,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     user,
     token,
     login,
-    logout,
+    logout: logoutUser,
     isLoading,
     handleApiError, // Provide the new handler
   };

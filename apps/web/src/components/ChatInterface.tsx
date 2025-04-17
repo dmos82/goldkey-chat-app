@@ -4,6 +4,7 @@ import React, { useState, FormEvent, ChangeEvent, useEffect, useRef } from 'reac
 import PdfViewerModal from './PdfViewerModal';
 import { useAuth } from '@/context/AuthContext';
 import { Message, Source } from '@/types'; // Import types from centralized location
+import { API_BASE_URL } from '@/lib/config';
 
 // Define search mode type
 type SearchMode = 'system' | 'user';
@@ -73,7 +74,7 @@ export default function ChatInterface({
           .filter(m => m.sender === 'user' || m.sender === 'assistant') // Basic filter
           .map(m => ({ sender: m.sender, text: m.text })); // Map to { sender, text }
 
-      const response = await fetch('http://localhost:3001/api/chat', {
+      const response = await fetch(`${API_BASE_URL}/api/chat`, {
         method: 'POST',
         headers: headers,
         body: JSON.stringify({

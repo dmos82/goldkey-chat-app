@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { FileText } from 'lucide-react'; // Use an icon
+import { API_BASE_URL } from '@/lib/config';
 
 interface SidebarDocument {
   _id: string;
@@ -35,8 +36,7 @@ const DocumentSidebar: React.FC<DocumentSidebarProps> = ({ onDocumentClick }) =>
       setIsLoading(true);
       setError(null);
       try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-        const response = await fetch(`${apiUrl}/api/system-kb/`, {
+        const response = await fetch(`${API_BASE_URL}/api/system-kb/`, {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${token}`,

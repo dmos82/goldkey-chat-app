@@ -4,6 +4,7 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import debounce from 'lodash/debounce';
 import { useAuth } from '@/context/AuthContext';
 import { List, Trash2 } from 'lucide-react';
+import { API_BASE_URL } from '@/lib/config';
 
 interface Document {
   id: string;
@@ -53,7 +54,7 @@ export default function DocumentList({ onOpenFile }: DocumentListProps) {
           'Authorization': `Bearer ${token}`,
         };
 
-        const response = await fetch('http://localhost:3001/api/documents', {
+        const response = await fetch(`${API_BASE_URL}/api/documents`, {
           signal: abortController.signal,
           headers: headers,
         });
@@ -126,7 +127,7 @@ export default function DocumentList({ onOpenFile }: DocumentListProps) {
       const headers: HeadersInit = {
         'Authorization': `Bearer ${token}`,
       };
-      const response = await fetch(`http://localhost:3001/api/documents/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/documents/${id}`, {
         method: 'DELETE',
         headers: headers,
       });

@@ -10,6 +10,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useToast } from "@/components/ui/use-toast"; // Ensure you have toast component set up
 import { Trash2, UploadCloud, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { API_BASE_URL } from '@/lib/config';
 
 // Define the structure for system documents
 interface SystemDocument {
@@ -30,15 +31,13 @@ const AdminSystemKbPage: React.FC = () => {
   const [docToDelete, setDocToDelete] = useState<SystemDocument | null>(null);
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-
   // Fetch documents
   const fetchDocuments = async () => {
     console.log('AdminSystemKbPage: Fetching documents...');
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${apiUrl}/api/admin/system-kb/documents`, {
+      const response = await fetch(`${API_BASE_URL}/api/admin/system-kb/documents`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -94,7 +93,7 @@ const AdminSystemKbPage: React.FC = () => {
     formData.append('systemDocument', selectedFile); // Match the field name expected by Multer
 
     try {
-      const response = await fetch(`${apiUrl}/api/admin/system-kb/upload`, {
+      const response = await fetch(`${API_BASE_URL}/api/admin/system-kb/upload`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -132,7 +131,7 @@ const AdminSystemKbPage: React.FC = () => {
     console.log('AdminSystemKbPage: Attempting to delete document:', docToDelete._id);
     setIsDeleting(true);
     try {
-      const response = await fetch(`${apiUrl}/api/admin/system-kb/documents/${docToDelete._id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/admin/system-kb/documents/${docToDelete._id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,

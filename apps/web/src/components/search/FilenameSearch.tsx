@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { API_BASE_URL } from '@/lib/config';
 
 interface SearchResult {
   _id: string;
@@ -36,9 +37,7 @@ const FilenameSearch: React.FC = () => {
 
     try {
       const encodedQuery = encodeURIComponent(searchQuery.trim());
-      // Use environment variable for API base URL in production
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-      const response = await fetch(`${apiUrl}/api/search/filename?q=${encodedQuery}`, {
+      const response = await fetch(`${API_BASE_URL}/api/search/filename?q=${encodedQuery}`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -99,9 +98,20 @@ const FilenameSearch: React.FC = () => {
 
   const getDocumentUrl = (docId: string): string => {
      // TODO: Use a more robust way to construct this URL, potentially involving router or config
-     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-     return `${apiUrl}/api/documents/user/${docId}`; // Direct download/view link for now
+     // const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+     return `${API_BASE_URL}/api/documents/user/${docId}`; // Direct download/view link for now
   }
+
+  const handleResultClick = (docId: string) => {
+    // Remove local apiUrl definition
+    // const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+    // Construct the URL to fetch the document content or viewer page
+    // This might need adjustment based on how PDF viewing is implemented
+    // Example: Assuming a route exists to fetch the raw PDF or its structured content
+    // const documentUrl = `${apiUrl}/api/documents/${docId}`; 
+    // For now, just log, actual navigation/fetching might happen elsewhere
+    console.log(`Clicked on result, would fetch/navigate to docId: ${docId}`);
+  };
 
   return (
     <div className="p-4 border rounded-md shadow-sm bg-white dark:bg-gray-800">

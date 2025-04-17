@@ -1,5 +1,4 @@
-// Use environment variable for API base URL
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001';
+import { API_BASE_URL } from '@/lib/config';
 
 interface Credentials {
   username: string;
@@ -67,10 +66,10 @@ export async function registerUser(credentials: Credentials): Promise<AuthRespon
  */
 export async function loginUser(credentials: Credentials): Promise<AuthResponse> {
   try {
-    // Log the exact URL being used just before fetching
-    console.log(`[authService] API_BASE_URL at function start: ${API_BASE_URL}`);
+    // Remove local log if config has one
+    // console.log(`[authService] API_BASE_URL at function start: ${API_BASE_URL}`);
     const loginUrl = `${API_BASE_URL}/api/auth/login`;
-    console.log(`[authService] Attempting fetch to: ${loginUrl}`);
+    console.log(`[authService] Attempting fetch to: ${loginUrl}`); // Keep this more specific log
 
     const response = await fetch(loginUrl, {
       method: 'POST',

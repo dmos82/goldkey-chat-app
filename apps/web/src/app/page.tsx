@@ -25,6 +25,7 @@ import { fetchDocuments, fetchChatList, fetchChatDetails } from '@/lib/api'; // 
 import { Document, Message, ChatSummary, ChatDetail } from '@/types'; // Import required types from @/types
 import { useToast } from "@/components/ui/use-toast"; // Import useToast
 import { useInactivityTimer } from "@/hooks/useInactivityTimer"; // Import the new hook
+import { API_BASE_URL } from '@/lib/config';
 // Re-lint trigger comment
 
 // Type definitions (consider moving to types/)
@@ -211,7 +212,6 @@ export default function Home() {
     console.log(`[Home] handleFileClick: docId=${docId}, sourceType=${sourceType}, fileName=${originalFileName}, page=${initialPage}`);
     if (!token) { /* Add proper handling for no token */ console.error("No auth token found!"); return; }
 
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
     let endpoint = '';
     // Adjusted endpoints based on typical API structure
     if (sourceType === 'system') endpoint = `/api/system-kb/download/${docId}`; 
@@ -219,7 +219,7 @@ export default function Home() {
     else return;
 
     try {
-        const response = await fetch(`${apiUrl}${endpoint}`, { headers: { 'Authorization': `Bearer ${token}` } });
+        const response = await fetch(`${API_BASE_URL}${endpoint}`, { headers: { 'Authorization': `Bearer ${token}` } });
         if (!response.ok) { 
              console.error(`Failed to fetch ${sourceType} doc: ${response.status}`);
              if (response.status === 401 && logout) logout(); // Example: logout on 401
@@ -306,8 +306,9 @@ export default function Home() {
     }
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-      const response = await fetch(`${apiUrl}/api/chat/chats/${chatIdToDelete}`, {
+      // Use dynamic endpoint based on chatId presence
+      const endpoint = chatIdToDelete ? `/api/chat/chats/${chatIdToDelete}` : '/api/chat/chats';
+      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` },
       });

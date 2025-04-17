@@ -40,6 +40,7 @@ import {
   DialogClose,
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label";
+import { API_BASE_URL } from '@/lib/config';
 
 // Define Document Type
 interface SystemKbDocument {
@@ -73,7 +74,6 @@ export default function AdminPage() {
   const { toast } = useToast();
   const { user, isLoading, token } = useAuth();
   const isAuthenticated = !isLoading && !!user;
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 
   const [documents, setDocuments] = useState<SystemKbDocument[]>([]);
   const [isDocsLoading, setIsDocsLoading] = useState<boolean>(true);
@@ -112,7 +112,7 @@ export default function AdminPage() {
     console.log('Fetching System KB documents...');
     setIsDocsLoading(true);
     try {
-      const response = await fetch(`${apiUrl}/admin/system-kb/documents`, {
+      const response = await fetch(`${API_BASE_URL}/api/admin/system-kb/documents`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -142,7 +142,7 @@ export default function AdminPage() {
       setIsDocsLoading(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, user, isAuthenticated, apiUrl, toast]);
+  }, [token, user, isAuthenticated, toast]);
 
   // useEffect hook for initial document fetch - Now calls the standalone function
   useEffect(() => {
@@ -190,7 +190,7 @@ export default function AdminPage() {
     setIsUsersLoading(true);
     setUsersError(null);
     try {
-      const response = await fetch(`${apiUrl}/admin/users`, {
+      const response = await fetch(`${API_BASE_URL}/api/admin/users`, {
         headers: { 'Authorization': `Bearer ${token}` },
       });
       if (!response.ok) {
@@ -211,7 +211,7 @@ export default function AdminPage() {
     } finally {
       setIsUsersLoading(false);
     }
-  }, [token, user, isAuthenticated, apiUrl, toast]);
+  }, [token, user, isAuthenticated, toast]);
 
   // --- Trigger data fetch based on active tab ---
   const handleTabChange = (value: string) => {
@@ -236,7 +236,7 @@ export default function AdminPage() {
     }
 
     try {
-      const response = await fetch(`${apiUrl}/admin/system-kb/documents/${docId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/admin/system-kb/documents/${docId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -336,7 +336,7 @@ export default function AdminPage() {
       formData.append('file', file);
 
       try {
-        const response = await fetch(`${apiUrl}/admin/system-kb/upload`, {
+        const response = await fetch(`${API_BASE_URL}/api/admin/system-kb/upload`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -418,7 +418,7 @@ export default function AdminPage() {
     console.log(`[Admin Users] Attempting to delete user: ${userToDelete.username} (ID: ${userToDelete._id})`);
 
     try {
-      const response = await fetch(`${apiUrl}/admin/users/${userToDelete._id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/admin/users/${userToDelete._id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` },
       });
@@ -490,7 +490,7 @@ export default function AdminPage() {
     console.log(`[Admin Users] Attempting to change password for user: ${userToUpdate.username} (ID: ${userToUpdate._id})`);
 
     try {
-      const response = await fetch(`${apiUrl}/admin/users/${userToUpdate._id}/password`, {
+      const response = await fetch(`${API_BASE_URL}/api/admin/users/${userToUpdate._id}/password`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

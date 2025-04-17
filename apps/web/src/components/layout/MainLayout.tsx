@@ -36,6 +36,7 @@ import {
   AlertDialogTitle 
 } from "@/components/ui/alert-dialog"; // Import AlertDialog components
 import { cn } from "@/lib/utils"; // Import cn for conditional class names
+import { API_BASE_URL } from '@/lib/config';
 
 // Re-define Document type locally if not imported, or ensure import is correct
 interface Document {
@@ -105,26 +106,23 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
   // Fetch KB docs when overlay is opened (or on mount if preferred)
   useEffect(() => {
     if (isKbOverlayVisible && token && kbDocuments.length === 0) { // Only fetch if visible and not already loaded
-      const loadKbDocs = async () => {
-        setKbLoading(true);
-        setKbError(null);
+      const fetchSystemDocuments = async () => {
+        if (!token) return;
         try {
-          // Use the fetchDocuments function or implement fetch directly
-           const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-           const response = await fetch(`${apiUrl}/api/system-kb/`, {
-             method: 'GET',
-             headers: { 'Authorization': `Bearer ${token}` },
-           });
-           if (!response.ok) {
-             if (response.status === 401) throw new Error('Unauthorized');
-             throw new Error(`Failed to fetch KB (${response.status})`);
-           }
-           const data = await response.json();
-           if (data.success && Array.isArray(data.documents)) {
-             setKbDocuments(data.documents);
-           } else {
-             throw new Error('Invalid KB data format');
-           }
+          const response = await fetch(`${API_BASE_URL}/api/system-kb/`, {
+            method: 'GET',
+            headers: { 'Authorization': `Bearer ${token}` },
+          });
+          if (!response.ok) {
+            if (response.status === 401) throw new Error('Unauthorized');
+            throw new Error(`Failed to fetch KB (${response.status})`);
+          }
+          const data = await response.json();
+          if (data.success && Array.isArray(data.documents)) {
+            setKbDocuments(data.documents);
+          } else {
+            throw new Error('Invalid KB data format');
+          }
         } catch (err: any) {
           console.error("Error fetching KB docs:", err);
           setKbError(err.message || 'Failed to load System KB');
@@ -132,7 +130,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
           setKbLoading(false);
         }
       };
-      loadKbDocs();
+      fetchSystemDocuments();
     }
   }, [isKbOverlayVisible, token]); // Removed kbDocuments.length dependency to allow re-fetch on reopen
 

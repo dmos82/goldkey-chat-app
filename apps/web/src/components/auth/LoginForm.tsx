@@ -15,14 +15,17 @@ export default function LoginForm() {
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    console.log('[LoginForm] handleSubmit triggered.');
     setError(null);
     setIsLoading(true);
 
     try {
       const credentials = { username, password };
-      console.log('Attempting login with:', credentials);
+      console.log('[LoginForm] Credentials prepared:', credentials);
+      console.log('[LoginForm] Calling loginUser service...');
       const response = await loginUser(credentials);
-      console.log('Login API successful:', response);
+      console.log('[LoginForm] loginUser service call completed.');
+      console.log('[LoginForm] Login API response received:', response);
 
       if (response.token && response.userId && response.username && response.role) {
         const userData: AuthenticatedUser = {
@@ -41,15 +44,16 @@ export default function LoginForm() {
         }, 50); // Small delay (e.g., 50ms)
 
       } else {
-        console.error('Login response missing required fields (token, userId, username, role):', response);
+        console.error('[LoginForm] Login response missing required fields:', response);
         setError('Login failed: Incomplete user data received from server.');
       }
 
     } catch (err: any) {
       const errorMessage = err?.error || 'An unknown error occurred during login.';
-      console.error('Login failed:', err);
+      console.error('[LoginForm] Error during login process:', err);
       setError(errorMessage);
     } finally {
+      console.log('[LoginForm] Setting isLoading to false.');
       setIsLoading(false);
     }
   };

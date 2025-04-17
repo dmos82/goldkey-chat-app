@@ -1,14 +1,14 @@
 // Utility functions for API calls
 import { Document, ChatSummary, ChatDetail } from '@/types'; // Import necessary types
+import { API_BASE_URL } from './config'; // Import the centralized base URL
 
-// Correct environment variable name
-const API_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001'; 
-
-console.log(`[API Lib] Using API Base URL: ${API_URL}`); // Add log for verification
+// Remove the local definition and log:
+// const API_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001'; 
+// console.log(`[API Lib] Using API Base URL: ${API_URL}`); 
 
 // --- Existing Document Fetch Function (Example) ---
 export async function fetchDocuments(token: string): Promise<Document[]> {
-  const response = await fetch(`${API_URL}/api/documents`, {
+  const response = await fetch(`${API_BASE_URL}/api/documents`, {
     headers: { 'Authorization': `Bearer ${token}` },
   });
   if (!response.ok) {
@@ -25,7 +25,7 @@ export async function fetchDocuments(token: string): Promise<Document[]> {
 
 // --- New Chat List Fetch Function ---
 export async function fetchChatList(token: string): Promise<ChatSummary[]> {
-  const response = await fetch(`${API_URL}/api/chat/chats`, {
+  const response = await fetch(`${API_BASE_URL}/api/chat/chats`, {
     headers: { 'Authorization': `Bearer ${token}` },
   });
   if (!response.ok) {
@@ -41,7 +41,7 @@ export async function fetchChatList(token: string): Promise<ChatSummary[]> {
 
 // --- New Chat Details Fetch Function ---
 export async function fetchChatDetails(chatId: string, token: string): Promise<ChatDetail> {
-  const response = await fetch(`${API_URL}/api/chat/chats/${chatId}`, {
+  const response = await fetch(`${API_BASE_URL}/api/chat/chats/${chatId}`, {
     headers: { 'Authorization': `Bearer ${token}` },
   });
   if (!response.ok) {
