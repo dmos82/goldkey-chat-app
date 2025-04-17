@@ -296,7 +296,7 @@ router.post('/upload', protect, checkSession, upload.single('file'), async (req:
                 metadata: {
                     documentId: documentId,
                     userId: userId,
-                    originalFileName: originalFileName,
+            originalFileName: originalFileName,
                     chunkIndex: index,
                     text: chunkText, // Include the chunk text in metadata
                     sourceType: 'user' // Mark source type in metadata
@@ -320,7 +320,7 @@ router.post('/upload', protect, checkSession, upload.single('file'), async (req:
         console.log(`[Upload] Deleted temporary file: ${file.path}`);
 
         return res.status(201).json({
-            success: true,
+            success: true, 
             message: `Document '${originalFileName}' uploaded and processed successfully.`,
             documentId: documentId,
             chunksProcessed: textChunks.length
@@ -519,14 +519,14 @@ router.delete('/:id', protect, checkSession, async (req: Request, res: Response)
         if (document.fileName) { // Assuming fileName stores the unique name in /uploads
              const filePath = path.join(UPLOADS_DIR, document.fileName);
              try {
-                 await fs.unlink(filePath);
+            await fs.unlink(filePath);
                  console.log(`[DocumentDelete] Deleted stored file: ${filePath}`);
              } catch (unlinkError: any) {
                  // Log if file deletion fails, but don't block response
                  if (unlinkError.code !== 'ENOENT') { // Ignore 'file not found' errors
                      console.error(`[DocumentDelete] Error deleting stored file ${filePath}:`, unlinkError);
                  }
-             }
+            }
         }
 
         return res.status(200).json({ success: true, message: 'Document deleted successfully.' });

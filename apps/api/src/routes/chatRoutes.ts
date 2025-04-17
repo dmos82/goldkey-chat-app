@@ -1,10 +1,11 @@
 import express, { Request, Response, Router } from 'express';
 import mongoose, { Types } from 'mongoose';
 import { protect, checkSession } from '../middleware/authMiddleware';
-import { generateEmbeddings, getChatCompletion } from '../utils/openaiHelper';
+import { generateEmbeddings, getChatCompletion, getChatCompletionWithHistory } from '../utils/openaiHelper';
 import { ChatCompletionMessageParam as OpenAIChatCompletionMessageParam } from 'openai/resources/chat';
 import { Chat, IChatMessage, IChat } from '../models/ChatModel';
 import { queryVectors } from '../utils/pineconeService';
+import { saveChatHistory, getChatHistory } from '../utils/chatHistoryService';
 
 const router: Router = express.Router();
 
@@ -63,7 +64,7 @@ router.post('/', async (req: Request, res: Response): Promise<void | Response> =
         if (sourceType === 'user') {
             filter.userId = userId.toString(); // Add userId filter ONLY for user documents
             console.log(`[Chat] Applying user-specific filter: ${JSON.stringify(filter)}`);
-        } else {
+            } else {
             console.log(`[Chat] Applying system-only filter: ${JSON.stringify(filter)}`);
         }
         
@@ -110,19 +111,26 @@ router.post('/', async (req: Request, res: Response): Promise<void | Response> =
             context = `No relevant context found in ${sourceType === 'user' ? 'user' : 'system'} documents.`; // Provide placeholder context
         }
 
+        // === ADD LOGGING FOR RETRIEVED CONTEXT ===
+        console.log(`[Chat RAG Debug] Found ${sources.length} context sources.`);
+        console.log('[Chat RAG Debug] Context string start:', context.substring(0, 200) + (context.length > 200 ? '...' : '')); 
+
         // 4. Format the prompt for OpenAI (Using existing SYSTEM_PROMPT_TEMPLATE)
         const systemPrompt = SYSTEM_PROMPT_TEMPLATE.replace('${context}', context);
 
         // 5. Build conversation history
         const messages: OpenAIChatCompletionMessageParam[] = [
             { role: 'system', content: systemPrompt },
-            ...history 
+            ...history
                 .filter((msg: any) => msg.role && msg.content) // Basic validation
                 .map((msg: any) => ({ role: msg.role, content: msg.content })), // Ensure correct format
             { role: 'user', content: query }
         ];
      
         console.log('[Chat] Preparing to call OpenAI with history length:', history.length);
+
+        // === ADD LOGGING FOR FINAL PROMPT ===
+        console.log('[Chat RAG Debug] Messages being sent to OpenAI:', JSON.stringify(messages, null, 2)); // Log the full messages array
 
         // 6. Call OpenAI API
         console.time('OpenAICallDuration');
@@ -195,8 +203,8 @@ router.post('/', async (req: Request, res: Response): Promise<void | Response> =
                 chat = new Chat({
                     userId: new mongoose.Types.ObjectId(userId.toString()),
                     title: chatTitle, // Use first part of query as title
-                    messages: [userMessage, assistantMessage]
-                });
+                        messages: [userMessage, assistantMessage]
+                    });
                 console.log(`[Chat Persistence] New chat object created with ID ${chat._id}`);
             }
 
