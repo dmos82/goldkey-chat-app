@@ -51,19 +51,19 @@ export const protect = async (req: Request, res: Response, next: NextFunction): 
   }
 
   try {
-    // Log the secret before verifying
-    const secretForVerification = process.env.JWT_SECRET || 'fallback_secret';
+    // Directly read and check JWT_SECRET before verifying
+    const verificationSecret = process.env.JWT_SECRET;
+    if (!verificationSecret) {
+      console.error('[Protect - JWT Verify] CRITICAL: JWT_SECRET environment variable is missing!');
+      // Throw an error to be caught by the catch block below
+      throw new Error('Server configuration error: Verification key missing.');
+    }
     // Log the secret's length and last 5 chars for comparison
-    console.log(`[Protect - JWT Verify] Using JWT_SECRET (verification) - Length: ${secretForVerification?.length}, EndsWith: ${secretForVerification?.slice(-5)}`); 
+    console.log(`[Protect - JWT Verify] Using JWT_SECRET (verification) - Length: ${verificationSecret.length}, EndsWith: ${verificationSecret.slice(-5)}`); 
 
-    // Verify token
+    // Verify token using the directly read secret
     console.log('[Protect Middleware] Verifying token...');
-    // Remove the check for jwtSecret here as we defined secretForVerification above
-    // const jwtSecret = process.env.JWT_SECRET;
-    // if (!jwtSecret) { ... }
-
-    // Type assertion is okay here since jwt.verify throws on failure
-    const decoded = jwt.verify(token, secretForVerification) as DecodedUserPayload;
+    const decoded = jwt.verify(token, verificationSecret) as DecodedUserPayload;
     console.log('[Protect Middleware] Token VERIFIED. Decoded payload:', JSON.stringify(decoded));
 
     // ---> ADD LOG BEFORE DB CALL <--- 

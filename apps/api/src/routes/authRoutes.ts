@@ -99,17 +99,21 @@ router.post('/login', async (req: Request, res: Response): Promise<Response | vo
       role: user.role,
     };
 
-    // Log the secret before signing
-    const secretForSigning = process.env.JWT_SECRET || 'fallback_secret';
+    // Directly read and check JWT_SECRET before signing
+    const signingSecret = process.env.JWT_SECRET;
+    if (!signingSecret) {
+      console.error('[Login - JWT Sign] CRITICAL: JWT_SECRET environment variable is missing!');
+      return res.status(500).json({ message: 'Internal server error: Signing key not configured.' });
+    }
     // Log the secret's length and last 5 chars for comparison without exposing the full secret
-    console.log(`[Login - JWT Sign] Using JWT_SECRET (signing) - Length: ${secretForSigning?.length}, EndsWith: ${secretForSigning?.slice(-5)}`);
+    console.log(`[Login - JWT Sign] Using JWT_SECRET (signing) - Length: ${signingSecret.length}, EndsWith: ${signingSecret.slice(-5)}`);
 
     console.log(`[Login] Generating JWT for user: ${username} with session ID: ${newSessionId}`);
 
-    // Generate JWT with the new session ID as jwtid
+    // Generate JWT with the new session ID as jwtid, using the directly read secret
     const token = jwt.sign(
       payload,
-      secretForSigning, // Use the logged variable
+      signingSecret, // Use the directly read variable
       { 
         expiresIn: '1h', // Keep reasonable expiration
         jwtid: newSessionId, // Use the new session ID as the JWT ID (jti)
