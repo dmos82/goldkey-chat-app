@@ -166,12 +166,13 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
       {/* --- Updated Left Sidebar Area (Placeholder) --- */}
       <nav className="dark w-[240px] h-full fixed left-0 top-0 bg-accent p-3 flex flex-col flex-shrink-0 z-20 border-r border-border">
         <div className="mb-4 flex w-full">
-          <Image 
+          <Image
             src="/gk_logo_new.png" // Corrected path relative to the public folder
-            alt="Gold Key Insurance Logo" 
+            alt="Gold Key Insurance Logo"
             width={216} // Full width within padding (240px - 2*12px)
             height={60} // Adjusted height proportionally
             priority // Add priority if it's above the fold / important LCP element
+            unoptimized // Bypass Netlify optimization for this image
           />
         </div>
 

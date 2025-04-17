@@ -32,8 +32,14 @@ export default function LoginForm() {
         };
         console.log('[LoginForm] Data being passed to AuthContext.login:', userData);
         login(response.token, userData);
-        console.log('AuthContext updated with role. Redirecting...');
-        router.push('/');
+        console.log('AuthContext updated. Scheduling redirect...');
+        
+        // Delay redirect slightly to allow state update to propagate
+        setTimeout(() => {
+            console.log('Executing delayed redirect to /');
+            router.push('/'); 
+        }, 50); // Small delay (e.g., 50ms)
+
       } else {
         console.error('Login response missing required fields (token, userId, username, role):', response);
         setError('Login failed: Incomplete user data received from server.');
