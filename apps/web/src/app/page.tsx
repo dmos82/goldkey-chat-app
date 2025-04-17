@@ -90,26 +90,44 @@ export default function Home() {
 
   // --- Fetch Chat List ---
   const loadChatList = useCallback(async () => {
-    if (!token) return;
+    if (!token) return; // Don't fetch if no token
     setIsLoadingChats(true);
     setChatError(null);
     try {
+      // Call the utility function from api.ts, passing the token
       const fetchedChats = await fetchChatList(token);
       setChats(fetchedChats);
     } catch (error: any) {
       console.error("Error fetching chat list:", error);
       setChatError(error.message || 'Failed to load chat list.');
+      // Check error message for 401/Unauthorized and logout if found
       if (error.message?.includes('Unauthorized') || error.message?.includes('401')) {
-        logout();
+        toast({ // Add toast notification on forced logout
+            title: "Authentication Error",
+            description: "Your session may have expired. Please log in again.",
+            variant: "destructive",
+        });
+        logout(); // Call logout from AuthContext
       }
     } finally {
       setIsLoadingChats(false);
     }
-  }, [token, logout]);
+  }, [token, logout, toast]); // Added toast to dependencies
 
+  // --- Trigger Fetch on Mount/Token Change --- 
   useEffect(() => {
-    loadChatList();
-  }, [loadChatList]);
+    // Only attempt to load chats when a valid token is present
+    if (token) {
+      console.log('[Page Effect] Token found, loading chat list...'); // Add log
+      loadChatList();
+    } else {
+      // Optional: Clear chats if token becomes null (e.g., after logout)
+      console.log('[Page Effect] No token found, clearing chat list.'); // Add log
+      setChats([]);
+      setIsLoadingChats(false); // Ensure loading is false if no token
+    }
+    // Depend directly on the token value, keep loadChatList as it uses hooks too
+  }, [token, loadChatList]); // Updated dependencies
 
   // --- Fetch Messages for Selected Chat ---
   useEffect(() => {
