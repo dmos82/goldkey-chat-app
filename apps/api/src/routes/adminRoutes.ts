@@ -23,31 +23,25 @@ import { upsertVectors, deleteVectorsByFilter, PineconeVector } from '../utils/p
 
 const router: Router = express.Router();
 
-// --- Corrected Knowledge Base Path Definition ---
-const storageBasePath = process.env.STORAGE_MOUNT_PATH || '/data'; // Use ENV var or default
+// --- Corrected Knowledge Base Path Definition using Render Disk Path ---
+const storageBasePath = '/data'; // Use the chosen Render Disk Mount Path
 const KNOWLEDGE_BASE_DIR = path.join(storageBasePath, 'knowledge_base_docs');
-console.log(`[Admin Routes] KNOWLEDGE_BASE_DIR set to: ${KNOWLEDGE_BASE_DIR}`);
+console.log(`[Admin Routes] KNOWLEDGE_BASE_DIR configured to: ${KNOWLEDGE_BASE_DIR}`);
 
-// Ensure directory exists (important for uploads)
+// Ensure the target directory exists (Create it if it doesn't)
 try {
     if (!fs.existsSync(KNOWLEDGE_BASE_DIR)) {
         fs.mkdirSync(KNOWLEDGE_BASE_DIR, { recursive: true });
-        console.log(`[Admin Routes FS Check] Created knowledge base directory: ${KNOWLEDGE_BASE_DIR}`);
+        console.log(`[Admin Routes FS Setup] Created knowledge base directory: ${KNOWLEDGE_BASE_DIR}`);
     }
 } catch (err) {
-     console.error(`[Admin Routes FS Check Error] Failed to check/create knowledge base directory: ${KNOWLEDGE_BASE_DIR}`, err);
-     // Consider throwing error if creation is critical for uploads
+     console.error(`[Admin Routes FS Setup Error] Failed to check/create knowledge base directory: ${KNOWLEDGE_BASE_DIR}`, err);
+     // Handle error as needed
 }
 
-// --- Remove Old Path Definition ---
-// const TEMP_UPLOAD_DIR = path.resolve(__dirname, '../../../../temp_uploads'); // Keep temp relative for now, or use /tmp if available on Render
-const TEMP_UPLOAD_DIR = '/tmp/gkchatty_uploads'; // Use Render's recommended /tmp directory
-// const KNOWLEDGE_BASE_DIR = path.resolve(__dirname, '../../../../knowledge_base_docs'); // REMOVED
-
-// Ensure TEMP directory exists
-fs.mkdirSync(TEMP_UPLOAD_DIR, { recursive: true });
-// fs.mkdir(TEMP_UPLOAD_DIR, { recursive: true }).catch(err => console.error('Failed to create temp upload directory on startup:', err)); // Old async
-// fs.mkdir(KNOWLEDGE_BASE_DIR, { recursive: true }).catch(err => console.error('Failed to create knowledge base directory on startup:', err)); // REMOVED
+// Define temporary upload directory (using /tmp is fine)
+const TEMP_UPLOAD_DIR = '/tmp/gkchatty_uploads';
+fs.mkdirSync(TEMP_UPLOAD_DIR, { recursive: true }); // Ensure temp dir exists
 
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
@@ -170,6 +164,19 @@ router.post('/system-kb/upload', upload.single('file'), async (req: Request, res
         documentId = (newDocument._id as mongoose.Types.ObjectId).toString();
         console.log(`[Admin Upload] Saved System KB doc metadata to DB. ID: ${documentId}`);
 
+        // === START: Move file from temp to persistent storage ===
+        const finalFilePath = path.join(KNOWLEDGE_BASE_DIR, savedFileName); // Use correct dir + unique name
+        console.log(`[Admin Upload] Moving uploaded file from ${tempFilePath} to ${finalFilePath}`);
+        await fs.promises.rename(tempFilePath, finalFilePath); // Move the file
+        console.log(`[Admin Upload] File moved successfully.`);
+        // Update document with the final path
+        await UserDocument.findByIdAndUpdate(documentId, { 
+            sourcePath: finalFilePath, // Store the absolute path on Render disk
+            status: 'processing' // Keep processing status until vectors are done
+         });
+        console.log(`[Admin Upload] Updated document ${documentId} with final sourcePath.`);
+        // === END: Move file ===
+
         // 4. Generate embeddings
         console.log(`[Admin Upload] Generating ${textChunks.length} embeddings for doc ${documentId}...`);
         const embeddings = await generateEmbeddings(textChunks);
@@ -198,13 +205,9 @@ router.post('/system-kb/upload', upload.single('file'), async (req: Request, res
         await upsertVectors(vectors);
         console.log(`[Admin Upload] Successfully upserted System KB vectors for doc ${documentId}.`);
 
-        // 7. Update document status in MongoDB
+        // 7. Update document status in MongoDB to completed
         await UserDocument.findByIdAndUpdate(documentId, { status: 'completed' });
         console.log(`[Admin Upload] Updated System KB doc ${documentId} status to 'completed'.`);
-
-        // 8. Clean up temporary file
-        await fs.promises.unlink(tempFilePath);
-        console.log(`[Admin Upload] Deleted temporary file: ${tempFilePath}`);
 
         return res.status(201).json({
             success: true,

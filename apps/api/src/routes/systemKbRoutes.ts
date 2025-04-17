@@ -10,19 +10,21 @@ const router: Router = express.Router();
 // Apply protect and checkSession middleware to all routes in this file
 router.use(protect, checkSession);
 
-// --- Corrected Knowledge Base Path Definition ---
-const storageBasePath = process.env.STORAGE_MOUNT_PATH || '/data'; // Use ENV var or default
+// --- Corrected Knowledge Base Path Definition using Render Disk Path ---
+const storageBasePath = '/data'; // Use the chosen Render Disk Mount Path
 const KNOWLEDGE_BASE_DIR = path.join(storageBasePath, 'knowledge_base_docs');
-console.log(`[SystemKB Routes] KNOWLEDGE_BASE_DIR set to: ${KNOWLEDGE_BASE_DIR}`);
+console.log(`[SystemKB Routes] KNOWLEDGE_BASE_DIR configured to: ${KNOWLEDGE_BASE_DIR}`);
 
-// Ensure directory exists (optional check for downloads, good for consistency)
+// Ensure the target directory exists (Create it if it doesn't)
+// This check is less critical here than in uploads, but good for consistency
 try {
     if (!fs.existsSync(KNOWLEDGE_BASE_DIR)) {
-        // If it doesn't exist on download, it's an issue, but don't create it here.
-        console.warn(`[SystemKB Routes FS Check] Knowledge base directory NOT FOUND: ${KNOWLEDGE_BASE_DIR}. Downloads may fail.`);
+        fs.mkdirSync(KNOWLEDGE_BASE_DIR, { recursive: true });
+        console.log(`[SystemKB Routes FS Setup] Created knowledge base directory: ${KNOWLEDGE_BASE_DIR}`);
     }
 } catch (err) {
-     console.error(`[SystemKB Routes FS Check Error] Failed to check knowledge base directory: ${KNOWLEDGE_BASE_DIR}`, err);
+     console.error(`[SystemKB Routes FS Setup Error] Failed to check/create knowledge base directory: ${KNOWLEDGE_BASE_DIR}`, err);
+     // Handle error as needed
 }
 
 /**
@@ -117,12 +119,12 @@ router.get('/download/:id', async (req: Request, res: Response): Promise<void | 
     const documentId = new mongoose.Types.ObjectId(id);
 
     try {
-        // 1. Find the document metadata, including the actual stored fileName
+        // 1. Find the document metadata, MUST include fileName
         const document = await UserDocument.findOne({
             _id: documentId,
             sourceType: 'system'
         })
-        .select('_id originalFileName fileName mimeType')
+        .select('_id originalFileName fileName mimeType') // Ensure fileName is selected
         .lean<IUserDocument>();
 
         if (!document) {
@@ -130,7 +132,7 @@ router.get('/download/:id', async (req: Request, res: Response): Promise<void | 
             return res.status(404).json({ success: false, message: 'System document not found.' });
         }
 
-        // Ensure fileName exists
+        // Ensure fileName exists (essential)
         if (!document.fileName) {
              console.error(`[SystemKB Download Error] Document ${id} found in DB but is missing the required 'fileName' field.`);
              return res.status(422).json({ 
@@ -139,13 +141,13 @@ router.get('/download/:id', async (req: Request, res: Response): Promise<void | 
              });
         }
 
-        // 2. Construct the full path using the KNOWLEDGE_BASE_DIR and the stored fileName
+        // 2. Construct the full path using the CORRECTED KNOWLEDGE_BASE_DIR and the stored fileName
         const filePath = path.join(KNOWLEDGE_BASE_DIR, document.fileName);
         console.log(`[SystemKB Download] Constructed file path: ${filePath}`);
 
         // 3. Check if the file exists at the constructed path
         try {
-            await fs.promises.access(filePath);
+            await fs.promises.access(filePath); // Use promises version for async check
             console.log(`[SystemKB Download FS Check]: File access confirmed for ${filePath}`);
         } catch (accessError) {
             console.error(`[SystemKB Download FS Check Error]: Physical file not found on disk for document ${id}: ${filePath}`, accessError);
