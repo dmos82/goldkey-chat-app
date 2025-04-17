@@ -3,9 +3,10 @@ import { Pinecone, Index, RecordMetadata, PineconeRecord } from '@pinecone-datab
 let pinecone: Pinecone | null = null;
 let pineconeIndex: Index<RecordMetadata> | null = null;
 
-const PINECONE_INDEX_NAME = process.env.PINECONE_INDEX_NAME;
-const PINECONE_API_KEY = process.env.PINECONE_API_KEY;
-const PINECONE_ENVIRONMENT = process.env.PINECONE_ENVIRONMENT;
+// Reading at top level might be cached by Node module system
+const PINECONE_INDEX_NAME_TOP = process.env.PINECONE_INDEX_NAME;
+const PINECONE_API_KEY_TOP = process.env.PINECONE_API_KEY;
+const PINECONE_ENVIRONMENT_TOP = process.env.PINECONE_ENVIRONMENT;
 
 export const initPinecone = async (): Promise<Index<RecordMetadata>> => {
     if (pineconeIndex) {
@@ -14,18 +15,27 @@ export const initPinecone = async (): Promise<Index<RecordMetadata>> => {
     }
 
     console.log('[Pinecone] Initializing Pinecone client...');
-    if (!PINECONE_API_KEY || !PINECONE_ENVIRONMENT || !PINECONE_INDEX_NAME) {
-        console.error('[Pinecone] ERROR: Missing required Pinecone environment variables (API_KEY, ENVIRONMENT, INDEX_NAME).');
+
+    // Add detailed debug logging RIGHT BEFORE the check
+    console.log(`[Pinecone Debug] Checking process.env values within initPinecone:`);
+    console.log(`[Pinecone Debug] process.env.PINECONE_API_KEY Exists? ${!!process.env.PINECONE_API_KEY}, Length: ${process.env.PINECONE_API_KEY?.length}`);
+    console.log(`[Pinecone Debug] process.env.PINECONE_ENVIRONMENT: ${process.env.PINECONE_ENVIRONMENT}`);
+    console.log(`[Pinecone Debug] process.env.PINECONE_INDEX_NAME: ${process.env.PINECONE_INDEX_NAME}`);
+    console.log(`[Pinecone Debug] process.env.OPENAI_API_KEY Exists? ${!!process.env.OPENAI_API_KEY}, Length: ${process.env.OPENAI_API_KEY?.length}`);
+
+    // Now the original check (using direct process.env access for this check too for consistency)
+    if (!process.env.PINECONE_API_KEY || !process.env.PINECONE_ENVIRONMENT || !process.env.PINECONE_INDEX_NAME) {
+        console.error('[Pinecone] ERROR: Missing required Pinecone environment variables (API_KEY, ENVIRONMENT, INDEX_NAME). Check failed AFTER debug logs.');
         throw new Error('Missing Pinecone environment variables.');
     }
 
     try {
         pinecone = new Pinecone({
-            apiKey: PINECONE_API_KEY,
+            apiKey: process.env.PINECONE_API_KEY, // Use direct access here too
         });
 
-        console.log(`[Pinecone] Accessing index: ${PINECONE_INDEX_NAME}...`);
-        const index = pinecone.Index<RecordMetadata>(PINECONE_INDEX_NAME);
+        console.log(`[Pinecone] Accessing index: ${process.env.PINECONE_INDEX_NAME}...`); // Use direct access
+        const index = pinecone.Index<RecordMetadata>(process.env.PINECONE_INDEX_NAME);
         // Optional: Check if index exists or wait for it (depends on Pinecone client version features)
         // await index.describeIndexStats(); // Example: Check if index is ready
         pineconeIndex = index;
