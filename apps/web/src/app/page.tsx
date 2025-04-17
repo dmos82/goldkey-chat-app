@@ -210,32 +210,58 @@ export default function Home() {
 
   const handleFileClick = useCallback(async (docId: string, sourceType: 'system' | 'user', originalFileName: string, initialPage?: number, chunkText?: string) => {
     console.log(`[Home] handleFileClick: docId=${docId}, sourceType=${sourceType}, fileName=${originalFileName}, page=${initialPage}`);
-    if (!token) { /* Add proper handling for no token */ console.error("No auth token found!"); return; }
+    if (!token) { console.error("No auth token found!"); return; }
 
     let endpoint = '';
-    // Adjusted endpoints based on typical API structure
     if (sourceType === 'system') endpoint = `/api/system-kb/download/${docId}`; 
-    else if (sourceType === 'user') endpoint = `/api/documents/user/${docId}`; // Revert back to the correct user document endpoint
+    else if (sourceType === 'user') endpoint = `/api/documents/user/${docId}`; 
     else return;
 
     try {
         const response = await fetch(`${API_BASE_URL}${endpoint}`, { headers: { 'Authorization': `Bearer ${token}` } });
+        
         if (!response.ok) { 
              console.error(`Failed to fetch ${sourceType} doc: ${response.status}`);
-             if (response.status === 401 && logout) logout(); // Example: logout on 401
-             // Add user feedback (e.g., toast notification)
-             alert(`Error fetching document: ${response.statusText}`); // Simple feedback
+             if (response.status === 401 && logout) logout(); 
+             alert(`Error fetching document: ${response.statusText}`); 
              return;
         }
-        const blob = await response.blob();
-        const blobUrl = URL.createObjectURL(blob);
-        openModal(blobUrl, initialPage, chunkText, originalFileName);
+        
+        // --- Check Content-Type --- 
+        const contentType = response.headers.get('Content-Type');
+        console.log(`[handleFileClick] Fetched file Content-Type: ${contentType}`);
+
+        if (contentType && contentType.includes('application/pdf')) {
+            // It's a PDF, proceed with viewer
+            const blob = await response.blob();
+            const blobUrl = URL.createObjectURL(blob);
+            openModal(blobUrl, initialPage, chunkText, originalFileName);
+        } else {
+            // Not a PDF - Handle differently (e.g., direct download or message)
+            console.warn(`[handleFileClick] Non-PDF content type received (${contentType}). Attempting direct download.`);
+            toast({ 
+                title: "Preview Unavailable",
+                description: `Direct download started for non-PDF file: ${originalFileName}`,
+                variant: "default"
+             });
+             // Create blob URL anyway for download link
+             const blob = await response.blob();
+             const blobUrl = URL.createObjectURL(blob);
+             // Create a temporary link and click it
+             const link = document.createElement('a');
+             link.href = blobUrl;
+             link.download = originalFileName || 'downloaded-file';
+             document.body.appendChild(link);
+             link.click();
+             document.body.removeChild(link);
+             URL.revokeObjectURL(blobUrl); // Clean up blob URL after download starts
+        }
+
     } catch (error) {
         console.error('Error fetching/processing document:', error);
-        // Add user feedback
-        alert('An error occurred while loading the document.'); // Simple feedback
+        alert('An error occurred while loading the document.'); 
     }
-  }, [token, openModal, logout]); // Dependencies for useCallback
+  }, [token, openModal, logout, toast]); // Added toast dependency
 
   // --- Chat History Handlers ---
   const handleNewChat = () => {
