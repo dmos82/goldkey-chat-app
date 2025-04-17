@@ -99,12 +99,17 @@ router.post('/login', async (req: Request, res: Response): Promise<Response | vo
       role: user.role,
     };
 
+    // Log the secret before signing
+    const secretForSigning = process.env.JWT_SECRET || 'fallback_secret';
+    // Log the secret's length and last 5 chars for comparison without exposing the full secret
+    console.log(`[Login - JWT Sign] Using JWT_SECRET (signing) - Length: ${secretForSigning?.length}, EndsWith: ${secretForSigning?.slice(-5)}`);
+
     console.log(`[Login] Generating JWT for user: ${username} with session ID: ${newSessionId}`);
 
     // Generate JWT with the new session ID as jwtid
     const token = jwt.sign(
       payload,
-      process.env.JWT_SECRET || 'fallback_secret', // Use environment variable!
+      secretForSigning, // Use the logged variable
       { 
         expiresIn: '1h', // Keep reasonable expiration
         jwtid: newSessionId, // Use the new session ID as the JWT ID (jti)

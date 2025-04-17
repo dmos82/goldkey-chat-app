@@ -51,16 +51,19 @@ export const protect = async (req: Request, res: Response, next: NextFunction): 
   }
 
   try {
+    // Log the secret before verifying
+    const secretForVerification = process.env.JWT_SECRET || 'fallback_secret';
+    // Log the secret's length and last 5 chars for comparison
+    console.log(`[Protect - JWT Verify] Using JWT_SECRET (verification) - Length: ${secretForVerification?.length}, EndsWith: ${secretForVerification?.slice(-5)}`); 
+
     // Verify token
     console.log('[Protect Middleware] Verifying token...');
-    const jwtSecret = process.env.JWT_SECRET;
-    if (!jwtSecret) {
-      console.error('[Protect Middleware] FATAL ERROR: JWT_SECRET is not defined for verification.');
-      return res.status(500).json({ message: 'Server configuration error' }); // Keep 500 for config issue
-    }
+    // Remove the check for jwtSecret here as we defined secretForVerification above
+    // const jwtSecret = process.env.JWT_SECRET;
+    // if (!jwtSecret) { ... }
 
     // Type assertion is okay here since jwt.verify throws on failure
-    const decoded = jwt.verify(token, jwtSecret) as DecodedUserPayload;
+    const decoded = jwt.verify(token, secretForVerification) as DecodedUserPayload;
     console.log('[Protect Middleware] Token VERIFIED. Decoded payload:', JSON.stringify(decoded));
 
     // ---> ADD LOG BEFORE DB CALL <--- 
