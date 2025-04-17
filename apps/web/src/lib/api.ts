@@ -1,7 +1,10 @@
 // Utility functions for API calls
 import { Document, ChatSummary, ChatDetail } from '@/types'; // Import necessary types
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+// Correct environment variable name
+const API_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001'; 
+
+console.log(`[API Lib] Using API Base URL: ${API_URL}`); // Add log for verification
 
 // --- Existing Document Fetch Function (Example) ---
 export async function fetchDocuments(token: string): Promise<Document[]> {
