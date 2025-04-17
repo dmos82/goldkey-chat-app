@@ -2,7 +2,7 @@ import express, { Request, Response, Router } from 'express';
 import mongoose from 'mongoose';
 import multer from 'multer';
 import path from 'path';
-import fs from 'fs/promises';
+import fs from 'fs'; // Use synchronous fs for initial check/create
 import { v4 as uuidv4 } from 'uuid';
 import { protect, isAdmin, checkSession } from '../middleware/authMiddleware';
 import { UserDocument, IUserDocument } from '../models/UserDocument';
@@ -23,18 +23,43 @@ import { upsertVectors, deleteVectorsByFilter, PineconeVector } from '../utils/p
 
 const router: Router = express.Router();
 
-// Setup Multer for temporary file storage during upload
-const TEMP_UPLOAD_DIR = path.resolve(__dirname, '../../../../temp_uploads'); // Ensure this dir exists
-const KNOWLEDGE_BASE_DIR = path.resolve(__dirname, '../../../../knowledge_base_docs'); // Permanent storage
+// --- Corrected Knowledge Base Path Definition ---
+const storageBasePath = process.env.STORAGE_MOUNT_PATH || '/data'; // Use ENV var or default
+const KNOWLEDGE_BASE_DIR = path.join(storageBasePath, 'knowledge_base_docs');
+console.log(`[Admin Routes] KNOWLEDGE_BASE_DIR set to: ${KNOWLEDGE_BASE_DIR}`);
 
-// Ensure directories exist on startup
-fs.mkdir(TEMP_UPLOAD_DIR, { recursive: true }).catch(err => console.error('Failed to create temp upload directory on startup:', err));
-fs.mkdir(KNOWLEDGE_BASE_DIR, { recursive: true }).catch(err => console.error('Failed to create knowledge base directory on startup:', err));
+// Ensure directory exists (important for uploads)
+try {
+    if (!fs.existsSync(KNOWLEDGE_BASE_DIR)) {
+        fs.mkdirSync(KNOWLEDGE_BASE_DIR, { recursive: true });
+        console.log(`[Admin Routes FS Check] Created knowledge base directory: ${KNOWLEDGE_BASE_DIR}`);
+    }
+} catch (err) {
+     console.error(`[Admin Routes FS Check Error] Failed to check/create knowledge base directory: ${KNOWLEDGE_BASE_DIR}`, err);
+     // Consider throwing error if creation is critical for uploads
+}
+
+// --- Remove Old Path Definition ---
+// const TEMP_UPLOAD_DIR = path.resolve(__dirname, '../../../../temp_uploads'); // Keep temp relative for now, or use /tmp if available on Render
+const TEMP_UPLOAD_DIR = '/tmp/gkchatty_uploads'; // Use Render's recommended /tmp directory
+// const KNOWLEDGE_BASE_DIR = path.resolve(__dirname, '../../../../knowledge_base_docs'); // REMOVED
+
+// Ensure TEMP directory exists
+fs.mkdirSync(TEMP_UPLOAD_DIR, { recursive: true });
+// fs.mkdir(TEMP_UPLOAD_DIR, { recursive: true }).catch(err => console.error('Failed to create temp upload directory on startup:', err)); // Old async
+// fs.mkdir(KNOWLEDGE_BASE_DIR, { recursive: true }).catch(err => console.error('Failed to create knowledge base directory on startup:', err)); // REMOVED
 
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
+        // Use the corrected TEMP_UPLOAD_DIR for multer destination
         const uploadPath = path.join(TEMP_UPLOAD_DIR, 'temp_admin_uploads');
-        fs.mkdir(uploadPath, { recursive: true }).then(() => cb(null, uploadPath)).catch(err => cb(err, uploadPath));
+        fs.mkdir(uploadPath, { recursive: true }, (err) => { // Use callback form for multer
+            if (err) {
+                 console.error('Error creating multer destination subdir', err);
+                 return cb(err, uploadPath); // Pass error to multer
+            }
+             cb(null, uploadPath);
+        });
     },
     filename: (req, file, cb) => {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
@@ -107,7 +132,7 @@ router.post('/system-kb/upload', upload.single('file'), async (req: Request, res
 
     try {
         // 1. Read file content
-        const fileBuffer = await fs.readFile(tempFilePath);
+        const fileBuffer = await fs.promises.readFile(tempFilePath);
         if (file.mimetype === 'application/pdf') {
             // Using the same PDF util as documentRoutes
             const pageTexts = await extractPdfTextWithPages(fileBuffer);
@@ -178,7 +203,7 @@ router.post('/system-kb/upload', upload.single('file'), async (req: Request, res
         console.log(`[Admin Upload] Updated System KB doc ${documentId} status to 'completed'.`);
 
         // 8. Clean up temporary file
-        await fs.unlink(tempFilePath);
+        await fs.promises.unlink(tempFilePath);
         console.log(`[Admin Upload] Deleted temporary file: ${tempFilePath}`);
 
         return res.status(201).json({
@@ -191,7 +216,7 @@ router.post('/system-kb/upload', upload.single('file'), async (req: Request, res
     } catch (error: any) {
         console.error(`[Admin Upload] Error processing System KB file ${originalFileName}:`, error);
         if (tempFilePath) { // Attempt cleanup on error
-            await fs.unlink(tempFilePath).catch(err => console.error("[Admin Upload] Error deleting temp file during error handling:", err));
+            await fs.promises.unlink(tempFilePath).catch(err => console.error("[Admin Upload] Error deleting temp file during error handling:", err));
         }
         if (documentId) { // Attempt to mark DB entry as failed
              await UserDocument.findByIdAndUpdate(documentId, { status: 'failed', errorMessage: error.message }).catch(err => console.error("[Admin Upload] Error updating document status to failed:", err));

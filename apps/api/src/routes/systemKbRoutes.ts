@@ -3,17 +3,27 @@ import { UserDocument, IUserDocument } from '../models/UserDocument';
 import { protect, checkSession } from '../middleware/authMiddleware';
 import mongoose from 'mongoose';
 import path from 'path';
-import fs from 'fs/promises';
+import fs from 'fs'; // Use synchronous fs for initial check
 
 const router: Router = express.Router();
 
 // Apply protect and checkSession middleware to all routes in this file
 router.use(protect, checkSession);
 
-// Define the path to the knowledge base directory relative to the compiled output
-// This should match the path used in adminRoutes.ts
-const KNOWLEDGE_BASE_DIR = path.resolve(__dirname, '../../../../knowledge_base_docs');
-console.log(`[SystemKB Routes] KNOWLEDGE_BASE_DIR resolved to: ${KNOWLEDGE_BASE_DIR}`);
+// --- Corrected Knowledge Base Path Definition ---
+const storageBasePath = process.env.STORAGE_MOUNT_PATH || '/data'; // Use ENV var or default
+const KNOWLEDGE_BASE_DIR = path.join(storageBasePath, 'knowledge_base_docs');
+console.log(`[SystemKB Routes] KNOWLEDGE_BASE_DIR set to: ${KNOWLEDGE_BASE_DIR}`);
+
+// Ensure directory exists (optional check for downloads, good for consistency)
+try {
+    if (!fs.existsSync(KNOWLEDGE_BASE_DIR)) {
+        // If it doesn't exist on download, it's an issue, but don't create it here.
+        console.warn(`[SystemKB Routes FS Check] Knowledge base directory NOT FOUND: ${KNOWLEDGE_BASE_DIR}. Downloads may fail.`);
+    }
+} catch (err) {
+     console.error(`[SystemKB Routes FS Check Error] Failed to check knowledge base directory: ${KNOWLEDGE_BASE_DIR}`, err);
+}
 
 /**
  * @route   GET /api/system-kb/
@@ -135,7 +145,7 @@ router.get('/download/:id', async (req: Request, res: Response): Promise<void | 
 
         // 3. Check if the file exists at the constructed path
         try {
-            await fs.access(filePath);
+            await fs.promises.access(filePath);
             console.log(`[SystemKB Download FS Check]: File access confirmed for ${filePath}`);
         } catch (accessError) {
             console.error(`[SystemKB Download FS Check Error]: Physical file not found on disk for document ${id}: ${filePath}`, accessError);
