@@ -1,4 +1,18 @@
 import 'dotenv/config';
+
+// --- START: Environment Variable Dump ---
+console.log('--- Dumping All Environment Variables at Startup ---');
+console.log(JSON.stringify(process.env, null, 2));
+// Log specific critical variables for easier checking
+console.log(`PINECONE_API_KEY_PRESENT_LENGTH: ${process.env.PINECONE_API_KEY ? process.env.PINECONE_API_KEY.length : 'MISSING'}`);
+console.log(`PINECONE_ENVIRONMENT_PRESENT: ${!!process.env.PINECONE_ENVIRONMENT}`);
+console.log(`PINECONE_INDEX_NAME_PRESENT: ${!!process.env.PINECONE_INDEX_NAME}`);
+console.log(`OPENAI_API_KEY_PRESENT_LENGTH: ${process.env.OPENAI_API_KEY ? process.env.OPENAI_API_KEY.length : 'MISSING'}`);
+console.log(`MONGODB_URI_PRESENT: ${!!process.env.MONGODB_URI}`);
+console.log(`JWT_SECRET_PRESENT_LENGTH: ${process.env.JWT_SECRET ? process.env.JWT_SECRET.length : 'MISSING'}`);
+console.log('-----------------------------------------------------');
+// --- END: Environment Variable Dump ---
+
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import morgan from 'morgan';
