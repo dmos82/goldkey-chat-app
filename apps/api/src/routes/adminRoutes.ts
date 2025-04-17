@@ -166,9 +166,10 @@ router.post('/system-kb/upload', upload.single('file'), async (req: Request, res
 
         // === START: Move file from temp to persistent storage ===
         const finalFilePath = path.join(KNOWLEDGE_BASE_DIR, savedFileName); // Use correct dir + unique name
-        console.log(`[Admin Upload] Moving uploaded file from ${tempFilePath} to ${finalFilePath}`);
-        await fs.promises.rename(tempFilePath, finalFilePath); // Move the file
-        console.log(`[Admin Upload] File moved successfully.`);
+        console.log(`[Admin Upload] Copying uploaded file from ${tempFilePath} to ${finalFilePath}`);
+        await fs.promises.copyFile(tempFilePath, finalFilePath); // Copy the file
+        await fs.promises.unlink(tempFilePath); // Delete the original temporary file
+        console.log(`[Admin Upload] File copied from temp to persistent storage and temp file deleted.`);
         // Update document with the final path
         await UserDocument.findByIdAndUpdate(documentId, { 
             sourcePath: finalFilePath, // Store the absolute path on Render disk
