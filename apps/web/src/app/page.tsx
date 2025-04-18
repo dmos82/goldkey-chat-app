@@ -7,6 +7,7 @@ import {
   FileText,
   Library,
   ChevronRight,
+  Trash2,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useAuth } from '@/context/AuthContext'; // Reverted to Alias Path
@@ -14,6 +15,18 @@ import { useAuth } from '@/context/AuthContext'; // Reverted to Alias Path
 // import { Chat, IChatMessage as Message } from '../../api/src/models/ChatModel'; 
 
 import { Button } from '@/components/ui/button'; // Reverted to Alias Path
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+
 import ProtectedRoute from '@/components/ProtectedRoute'; // Reverted to Alias Path
 import ChatInterface from '@/components/ChatInterface'; // Reverted to Alias Path
 import DocumentList from '@/components/DocumentList'; // Reverted to Alias Path
@@ -76,6 +89,7 @@ export default function Home() {
   const [chatError, setChatError] = useState<string | null>(null);
 
   const { toast } = useToast(); // Initialize toast
+  const [isDeletingAll, setIsDeletingAll] = useState(false); // State for delete button loading
 
   // --- Setup Inactivity Timer --- 
   const INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
@@ -388,6 +402,45 @@ export default function Home() {
     }
   };
 
+  // --- Handler for Deleting ALL User Documents ---
+  const handleDeleteAllDocuments = async () => {
+    if (!token) {
+      toast({ variant: "destructive", title: "Error", description: "Authentication token not found." });
+      return;
+    }
+    setIsDeletingAll(true);
+    console.log('[Delete All Docs] Initiating deletion...');
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/documents/user/all`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+
+      const result = await response.json(); // Assume backend sends JSON response
+
+      if (!response.ok) {
+        throw new Error(result.message || `Failed to delete documents (${response.status})`);
+      }
+
+      console.log('[Delete All Docs] Success:', result);
+      toast({ title: "Success", description: result.message || "All documents deleted." });
+      // Refresh the document list by changing the key
+      setRefreshKey(prev => prev + 1);
+
+    } catch (error: any) {
+      console.error('[Delete All Docs] Error:', error);
+      toast({ 
+        variant: "destructive", 
+        title: "Error Deleting Documents", 
+        description: error.message || "An unknown error occurred."
+      });
+    } finally {
+      setIsDeletingAll(false);
+    }
+  };
+  // --- End Delete All Handler ---
+
   // Clean up Blob URL on unmount (consider moving to modal if more robust handling needed)
   useEffect(() => {
     return () => {
@@ -442,19 +495,49 @@ export default function Home() {
             </div>
           )}
 
-          {/* --- DOCS VIEW --- Now only shows My Documents */}
+          {/* --- DOCS VIEW --- */}
           {activeView === 'docs' && (
             <div className="space-y-4">
-              {/* Render My Documents Content Directly */}
               <div className="space-y-4">
                   <div className="bg-card dark:bg-card rounded-md p-4 shadow"> 
                      <FileUpload onUploadSuccess={handleUploadSuccess} />
                   </div>
-                  <div className="bg-card dark:bg-card rounded-md p-4 shadow"> 
+                  <div className="bg-card dark:bg-card rounded-md p-4 shadow space-y-4">
+                    {/* --- Document List Component --- */}
                      <DocumentList
                         key={refreshKey}
                         onOpenFile={(docId: string, fileName: string) => handleFileClick({ documentId: docId, type: 'user', source: fileName })} 
                       />
+                      
+                    {/* --- Delete All Button and Dialog --- */}
+                    <div className="pt-4 border-t border-border">
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="destructive" disabled={isDeletingAll}>
+                            <Trash2 className="mr-2 h-4 w-4" /> 
+                            {isDeletingAll ? 'Deleting...' : 'Delete All My Documents'}
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Confirm Deletion</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Are you sure you want to permanently delete ALL your uploaded documents?
+                              This action cannot be undone and will remove all associated data.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction 
+                              onClick={handleDeleteAllDocuments} 
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                              Delete All
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
                   </div>
               </div>
             </div>
