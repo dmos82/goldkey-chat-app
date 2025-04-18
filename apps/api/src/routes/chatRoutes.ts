@@ -132,8 +132,14 @@ router.post('/', async (req: Request, res: Response): Promise<void | Response> =
      
         console.log('[Chat] Preparing to call OpenAI with history length:', history.length);
 
-        // === ADD LOGGING FOR FINAL PROMPT ===
-        console.log('[Chat RAG Debug] Messages being sent to OpenAI:', JSON.stringify(messages, null, 2)); // Log the full messages array
+        // --- RAG DEBUG LOGGING --- 
+        console.log(`\n--- START RAG DEBUG LOG ---`);
+        console.log(`[RAG DEBUG] User Query: ${query}`);
+        console.log(`[RAG DEBUG] Retrieved Source Metadata: ${JSON.stringify(sources, null, 2)}`);
+        console.log(`[RAG DEBUG] Context Text Sent to LLM:\n---\n${context}\n---`);
+        // console.log(`[RAG DEBUG] Full System Prompt Sent to LLM:\n---\n${systemPrompt}\n---`); // Optional: Uncomment to log the full system prompt
+        console.log(`--- END RAG DEBUG LOG ---\n`);
+        // --- END RAG DEBUG LOGGING ---
 
         // 6. Call OpenAI API
         console.time('OpenAICallDuration');
