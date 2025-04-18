@@ -12,7 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Loader2 } from 'lucide-react';
+import { Loader2, Trash2 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from "@/components/ui/input";
@@ -28,6 +28,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
   Dialog,
@@ -99,6 +100,9 @@ export default function AdminPage() {
   const [confirmPassword, setConfirmPassword] = useState<string>('');
   const [passwordChangeError, setPasswordChangeError] = useState<string | null>(null);
   const [isUpdatingPassword, setIsUpdatingPassword] = useState<boolean>(false);
+
+  // --- State for Deleting All System Documents ---
+  const [isDeletingAllSystemDocs, setIsDeletingAllSystemDocs] = useState(false);
 
   // --- Document Fetching Logic (Refactored to standalone function) --- 
   const fetchDocuments = useCallback(async () => {
@@ -519,6 +523,46 @@ export default function AdminPage() {
     }
   };
 
+  // --- Handler for Deleting ALL System KB Documents ---
+  const handleDeleteAllSystemDocuments = async () => {
+    if (!token || user?.role !== 'admin') {
+      toast({ variant: "destructive", title: "Error", description: "Unauthorized or missing token." });
+      return;
+    }
+    setIsDeletingAllSystemDocs(true);
+    console.log('[Admin Delete All System Docs] Initiating deletion...');
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/admin/system-kb/all`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+
+      const result = await response.json(); // Assume backend sends JSON response
+
+      if (!response.ok) {
+        throw new Error(result.message || `Failed to delete documents (${response.status})`);
+      }
+
+      console.log('[Admin Delete All System Docs] Success:', result);
+      toast({ title: "Success", description: result.message || "All System KB documents deleted." });
+      // Refresh the document list by calling fetchDocuments
+      fetchDocuments(); 
+
+    } catch (error: any) {
+      console.error('[Admin Delete All System Docs] Error:', error);
+      toast({ 
+        variant: "destructive", 
+        title: "Error Deleting System KB", 
+        description: error.message || "An unknown error occurred."
+      });
+    } finally {
+      setIsDeletingAllSystemDocs(false);
+      // Optionally close the dialog if needed, but AlertDialog usually handles this
+    }
+  };
+  // --- End Delete All System KB Handler ---
+
   if (isLoading) {
     return (
       <div className="flex h-screen items-center justify-center">
@@ -600,6 +644,41 @@ export default function AdminPage() {
             {uploadError && (
               <p className="mt-2 text-sm text-red-600 dark:text-red-400 whitespace-pre-wrap">{uploadError}</p>
             )}
+          </div>
+
+          {/* Delete All Button & Dialog */}
+          <div className="bg-card dark:bg-card border border-border rounded-lg p-6 shadow-sm">
+            <h3 className="text-lg font-semibold mb-3">Manage System KB</h3>
+            <AlertDialog>
+                <AlertDialogTrigger asChild>
+                <Button variant="destructive" disabled={isDeletingAllSystemDocs}>
+                    <Trash2 className="mr-2 h-4 w-4" /> 
+                    {isDeletingAllSystemDocs ? 'Deleting...' : 'Delete All System Documents'}
+                </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Confirm System KB Deletion</AlertDialogTitle>
+                    <AlertDialogDescription>
+                    WARNING: Are you absolutely sure you want to permanently delete ALL documents in the System Knowledge Base? This action affects all users and cannot be undone.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction 
+                    onClick={handleDeleteAllSystemDocuments} 
+                    disabled={isDeletingAllSystemDocs}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                    {isDeletingAllSystemDocs ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    Delete All System Docs
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+            <p className="text-sm text-muted-foreground mt-2">
+Permanently remove all documents, metadata, and vector embeddings from the shared System Knowledge Base.
+            </p>
           </div>
 
           {isDocsLoading ? (
