@@ -21,6 +21,7 @@ import { extractPdfTextWithPages, chunkTextWithPages } from '../utils/pdfUtils';
 // Import Pinecone service functions
 import { upsertVectors, deleteVectorsByFilter, PineconeVector } from '../utils/pineconeService';
 import fsPromises from 'fs/promises'; // Ensure fs/promises is imported
+import { processAndEmbedDocument } from '../utils/documentProcessor'; // Use the dedicated processor
 
 const router: Router = express.Router();
 
@@ -29,11 +30,14 @@ const storageBasePath = '/data'; // Use the chosen Render Disk Mount Path
 const KNOWLEDGE_BASE_DIR = path.join(storageBasePath, 'knowledge_base_docs');
 console.log(`[Admin Routes] KNOWLEDGE_BASE_DIR configured to: ${KNOWLEDGE_BASE_DIR}`);
 
-// Ensure the target directory exists (Create it if it doesn't)
+// Ensure the target directory exists (Create it if it doesn't) - SAFER CHECK
 try {
-    if (!fs.existsSync(KNOWLEDGE_BASE_DIR)) {
+    // Only attempt mkdir if the base path exists (relevant for local dev)
+    if (fs.existsSync(storageBasePath) && !fs.existsSync(KNOWLEDGE_BASE_DIR)) {
         fs.mkdirSync(KNOWLEDGE_BASE_DIR, { recursive: true });
         console.log(`[Admin Routes FS Setup] Created knowledge base directory: ${KNOWLEDGE_BASE_DIR}`);
+    } else if (!fs.existsSync(storageBasePath)) {
+        console.warn(`[Admin Routes FS Setup] Base storage path ${storageBasePath} does not exist. Skipping KNOWLEDGE_BASE_DIR check/creation (expected in local dev).`);
     }
 } catch (err) {
      console.error(`[Admin Routes FS Setup Error] Failed to check/create knowledge base directory: ${KNOWLEDGE_BASE_DIR}`, err);
@@ -300,6 +304,135 @@ router.delete('/system-kb/documents/:id', async (req: Request, res: Response) =>
         return res.status(500).json({
             success: false,
             message: 'Error deleting System KB document.',
+            error: error.message || String(error)
+        });
+    }
+});
+
+// --- RE-INDEX System KB Document ---
+router.post('/system-kb/reindex/:documentId', isAdmin, async (req: Request, res: Response) => {
+    const { documentId } = req.params;
+    const adminUserId = req.user?._id;
+
+    console.log(`[Admin Reindex] Request received to re-index System KB document ${documentId} by admin ${adminUserId}`);
+
+    if (!mongoose.Types.ObjectId.isValid(documentId)) {
+        return res.status(400).json({ success: false, message: 'Invalid document ID format.' });
+    }
+
+    let document: IUserDocument | null = null;
+    let tempFilePath: string | undefined = undefined; // Not strictly needed here but pattern exists
+
+    try {
+        // 1. Fetch Document Metadata & Verify Type
+        document = await UserDocument.findById(documentId);
+        if (!document) {
+            return res.status(404).json({ success: false, message: 'Document not found.' });
+        }
+        if (document.sourceType !== 'system') {
+            return res.status(400).json({ success: false, message: 'Cannot re-index non-system documents via this endpoint.' });
+        }
+        if (!document.fileName) {
+             return res.status(400).json({ success: false, message: 'Document record is missing the required filename.' });
+        }
+
+        await UserDocument.findByIdAndUpdate(documentId, { status: 'reindexing', errorMessage: null });
+        console.log(`[Admin Reindex] Document ${documentId} status set to 'reindexing'.`);
+
+        // 2. Construct File Path
+        // Use fileName (unique name) for system docs stored directly in KNOWLEDGE_BASE_DIR
+        const filePath = path.join(KNOWLEDGE_BASE_DIR, document.fileName); 
+        console.log(`[Admin Reindex] Constructed file path: ${filePath}`);
+
+        // Check if file exists before processing
+        try {
+            await fsPromises.access(filePath, fs.constants.R_OK);
+            console.log(`[Admin Reindex] File exists and is readable: ${filePath}`);
+        } catch (accessError) {
+             console.error(`[Admin Reindex] File not found or not accessible at path: ${filePath}`, accessError);
+             await UserDocument.findByIdAndUpdate(documentId, { status: 'failed', errorMessage: 'File not found on server.' });
+             return res.status(404).json({ success: false, message: `Document file '${document.originalFileName}' not found on the server.` });
+        }
+
+
+        // 3. Delete Existing Vectors from Pinecone
+        console.log(`[Admin Reindex] Attempting to delete existing vectors for document ${documentId}...`);
+        try {
+            const filter = { documentId: documentId };
+            await deleteVectorsByFilter(filter);
+            console.log(`[Admin Reindex] Successfully deleted vectors with filter: ${JSON.stringify(filter)}`);
+        } catch (deleteError) {
+            console.error(`[Admin Reindex] Error deleting existing vectors for document ${documentId}:`, deleteError);
+            // Decide if this is fatal. Maybe vectors didn't exist? Log and continue for now.
+            // Consider adding a specific check/response if deletion *must* succeed before proceeding.
+            console.warn(`[Admin Reindex] Could not delete existing vectors (may not exist). Proceeding with upsert.`);
+        }
+
+
+        // 4. Re-Process and Embed Document
+        console.log(`[Admin Reindex] Processing and embedding document: ${document.originalFileName} (${documentId})`);
+        // Reuse the utility function
+        const { chunks, embeddings, totalChunks } = await processAndEmbedDocument(
+            filePath,
+            document.originalFileName || document.fileName // Use original name for logging if available
+        );
+       
+        if (totalChunks === 0 || embeddings.length === 0) {
+            console.warn(`[Admin Reindex] Processing resulted in zero chunks or embeddings for ${documentId}.`);
+            await UserDocument.findByIdAndUpdate(documentId, { status: 'failed', errorMessage: 'Document processing yielded no content.' });
+            return res.status(400).json({ success: false, message: 'Document processing yielded no content to index.' });
+        }
+        console.log(`[Admin Reindex] Processed ${totalChunks} chunks with embeddings for ${documentId}.`);
+
+
+        // 5. Prepare New Vectors for Pinecone
+        const vectors: PineconeVector[] = chunks.map((chunk, index) => ({
+            id: `${documentId}_chunk_${index}`, // Maintain consistent ID format
+            values: embeddings[index],
+            metadata: {
+                documentId: documentId,
+                originalFileName: document!.originalFileName, // Use ! because we checked non-null earlier
+                chunkIndex: index,
+                text: chunk.text,
+                sourceType: 'system'
+            }
+        }));
+        console.log(`[Admin Reindex] Prepared ${vectors.length} vectors for upsert.`);
+
+
+        // 6. Upsert New Vectors to Pinecone
+        console.log(`[Admin Reindex] Upserting ${vectors.length} new vectors for document ${documentId}...`);
+        await upsertVectors(vectors);
+        console.log(`[Admin Reindex] Successfully upserted new vectors for document ${documentId}.`);
+
+
+        // 7. Update Document Status in MongoDB
+        await UserDocument.findByIdAndUpdate(documentId, {
+            status: 'completed',
+            totalChunks: totalChunks, // Update chunk count in case it changed
+            uploadTimestamp: new Date() // Update timestamp to reflect re-indexing time
+        });
+        console.log(`[Admin Reindex] Updated document ${documentId} status to 'completed' and refreshed metadata.`);
+
+        return res.status(200).json({
+            success: true,
+            message: `Document '${document.originalFileName}' re-indexed successfully.`,
+            documentId: documentId,
+            chunksProcessed: totalChunks
+        });
+
+    } catch (error: any) {
+        console.error(`[Admin Reindex] Critical error during re-indexing document ${documentId}:`, error);
+        // Ensure status is marked as failed if an error occurs after setting 'reindexing'
+        if (documentId && document && document.status !== 'failed') {
+             await UserDocument.findByIdAndUpdate(documentId, { 
+                 status: 'failed', 
+                 errorMessage: `Re-indexing failed: ${error.message || String(error)}` 
+             }).catch(err => console.error("[Admin Reindex] Error updating document status to failed during error handling:", err));
+        }
+        return res.status(500).json({
+            success: false,
+            message: `Failed to re-index document '${document?.originalFileName || documentId}'.`,
             error: error.message || String(error)
         });
     }

@@ -15,12 +15,15 @@ const storageBasePath = '/data'; // Use the chosen Render Disk Mount Path
 const KNOWLEDGE_BASE_DIR = path.join(storageBasePath, 'knowledge_base_docs');
 console.log(`[SystemKB Routes] KNOWLEDGE_BASE_DIR configured to: ${KNOWLEDGE_BASE_DIR}`);
 
-// Ensure the target directory exists (Create it if it doesn't)
+// Ensure the target directory exists (Create it if it doesn't) - SAFER CHECK
 // This check is less critical here than in uploads, but good for consistency
 try {
-    if (!fs.existsSync(KNOWLEDGE_BASE_DIR)) {
+    // Only attempt mkdir if the base path exists (relevant for local dev)
+    if (fs.existsSync(storageBasePath) && !fs.existsSync(KNOWLEDGE_BASE_DIR)) {
         fs.mkdirSync(KNOWLEDGE_BASE_DIR, { recursive: true });
         console.log(`[SystemKB Routes FS Setup] Created knowledge base directory: ${KNOWLEDGE_BASE_DIR}`);
+    } else if (!fs.existsSync(storageBasePath)) {
+         console.warn(`[SystemKB Routes FS Setup] Base storage path ${storageBasePath} does not exist. Skipping KNOWLEDGE_BASE_DIR check/creation (expected in local dev).`);
     }
 } catch (err) {
      console.error(`[SystemKB Routes FS Setup Error] Failed to check/create knowledge base directory: ${KNOWLEDGE_BASE_DIR}`, err);
