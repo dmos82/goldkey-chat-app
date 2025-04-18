@@ -583,25 +583,34 @@ router.get('/user/:documentId', protect, async (req: Request, res: Response) => 
             return res.status(404).json({ success: false, message: 'Document metadata not found.' });
         }
 
-        // Add explicit check for req.user before accessing _id
-        if (!req.user) { 
-             // This case should technically be handled by 'protect', but satisfy TS
-             console.error('[DocumentServe User] Auth context missing after protect/checkSession.');
-             return res.status(401).json({ success: false, message: 'Authentication context missing.' });
-        } 
-        // Add assertion req.user! since the check above guarantees it's not null
-        
-        // --- ADD LOGGING BEFORE COMPARISON ---
-        const requestUserId = req.user!._id;
-        const documentUserId = doc.userId;
-        console.log(`[DocumentServe User - Auth Check] Comparing Request User ID (${typeof requestUserId}): ${requestUserId} with Document User ID (${typeof documentUserId}): ${documentUserId}`);
-        // --- END LOGGING BEFORE COMPARISON ---
-        
-        if (doc.sourceType !== 'user' || !documentUserId || documentUserId.toString() !== requestUserId.toString()) { // Ensure both are strings for comparison 
-            console.warn(`[DocumentServe User] Unauthorized attempt! DocType: ${doc.sourceType}, DocUserID: ${documentUserId?.toString()}, ReqUserID: ${requestUserId?.toString()}`); // Log values on failure
-            return res.status(403).json({ success: false, message: 'Forbidden: You do not have access to this document.' });
+        // Explicit check that req.user exists (should be guaranteed by 'protect')
+        if (!req.user?._id) {
+            console.error('[DocumentServe User] req.user._id missing after protect middleware.');
+            return res.status(500).json({ success: false, message: 'Internal server error: User context lost.' });
         }
-        // -------------------------------------------------------
+
+        // Check 1: Document must have a userId assigned
+        if (!doc.userId) {
+            console.warn(`[DocumentServe User] Access denied! Document ${documentId} is missing userId.`);
+            return res.status(403).json({ success: false, message: 'Forbidden: Document owner information missing.' });
+        }
+        
+        // Check 2: Ensure this route only serves 'user' type documents
+        if (doc.sourceType !== 'user') {
+             console.warn(`[DocumentServe User] Access denied! Attempt to access non-user doc via user route. DocID: ${doc._id}, Type: ${doc.sourceType}, ReqUser: ${req.user._id}`);
+             return res.status(403).json({ success: false, message: 'Forbidden: Invalid document type for this route.' });
+        }
+
+        // Check 3: Verify ownership by comparing stringified IDs
+        // Ensure both _id fields are converted to string for comparison
+        if (doc.userId.toString() !== req.user._id.toString()) { 
+             // Log values on failure
+             console.warn(`[DocumentServe User] Access denied! User ID mismatch. DocUserID: ${doc.userId.toString()}, ReqUserID: ${req.user._id.toString()}`);
+             return res.status(403).json({ success: false, message: 'Forbidden: You do not have access to this document.' });
+        }
+
+        // --- If all checks pass, proceed to serve file ---
+        console.log(`[DocumentServe User] Authorization PASSED for DocID: ${documentId}, UserID: ${req.user._id}`); // Add success log
 
         // Construct the full path using the saved (UUID-based) filename
         const filePath = path.join(UPLOADS_DIR, doc.fileName);
