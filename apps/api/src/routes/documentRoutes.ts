@@ -751,4 +751,96 @@ router.post('/generate-chat', protect, checkSession, async (req: Request, res: R
     }
 });
 
+// DELETE /api/documents/user/all - Delete ALL documents for the logged-in user (Protected)
+router.delete('/user/all', protect, async (req: Request, res: Response) => {
+    const userId = req.user?._id;
+    const userIdString = userId?.toString();
+
+    console.log(`[DocumentDelete All] Request received for user ${userIdString}`);
+
+    if (!userId) {
+        console.error('[DocumentDelete All] User ID missing from request.');
+        return res.status(401).json({ success: false, message: 'Authentication required.' });
+    }
+
+    let deletedDbCount = 0;
+    let attemptedFileDeletions = 0;
+    let successfulFileDeletions = 0;
+    let failedFileDeletions: string[] = [];
+
+    try {
+        // 1. Find all user document metadata to get filenames
+        const documentsToDelete = await UserDocument.find({
+            userId: new mongoose.Types.ObjectId(userIdString),
+            sourceType: 'user'
+        }).select('fileName');
+
+        const fileNamesToDelete = documentsToDelete.map(doc => doc.fileName).filter(Boolean); // Filter out any null/undefined filenames
+        attemptedFileDeletions = fileNamesToDelete.length;
+        console.log(`[DocumentDelete All] Found ${documentsToDelete.length} document records and ${attemptedFileDeletions} filenames for user ${userIdString}.`);
+
+        if (documentsToDelete.length === 0) {
+            return res.status(200).json({ success: true, message: 'No user documents found to delete.', deletedDbCount: 0, attemptedFileDeletions: 0 });
+        }
+
+        // 2. Delete DB records
+        console.log(`[DocumentDelete All] Deleting ${documentsToDelete.length} records from MongoDB for user ${userIdString}...`);
+        const dbResult = await UserDocument.deleteMany({
+            userId: new mongoose.Types.ObjectId(userIdString),
+            sourceType: 'user'
+        });
+        deletedDbCount = dbResult.deletedCount;
+        console.log(`[DocumentDelete All] Successfully deleted ${deletedDbCount} records from MongoDB.`);
+
+        // 3. Delete Pinecone vectors (fire-and-forget style with error logging)
+        console.log(`[DocumentDelete All] Initiating Pinecone vector deletion for user ${userIdString}...`);
+        deleteVectorsByFilter({ userId: userIdString, sourceType: 'user' })
+            .then(() => {
+                console.log(`[DocumentDelete All] Pinecone vector deletion successfully initiated for user ${userIdString}.`);
+            })
+            .catch(pineconeError => {
+                console.error(`[DocumentDelete All] Error initiating Pinecone vector deletion for user ${userIdString}:`, pineconeError);
+                // Log error but don't fail the entire operation
+            });
+
+        // 4. Delete physical files
+        console.log(`[DocumentDelete All] Attempting to delete ${attemptedFileDeletions} physical files for user ${userIdString} from ${USER_DOCUMENT_STORAGE_PATH}...`);
+        for (const fileName of fileNamesToDelete) {
+            const filePath = path.join(USER_DOCUMENT_STORAGE_PATH, fileName);
+            try {
+                await fs.unlink(filePath);
+                console.log(`[DocumentDelete All] Successfully deleted file: ${filePath}`);
+                successfulFileDeletions++;
+            } catch (fileError: any) {
+                if (fileError.code === 'ENOENT') {
+                    console.warn(`[DocumentDelete All] File not found (possibly already deleted): ${filePath}`);
+                    // Optionally count this as a "success" if the goal is absence
+                } else {
+                    console.error(`[DocumentDelete All] Failed to delete file ${filePath}:`, fileError);
+                    failedFileDeletions.push(fileName); 
+                }
+            }
+        }
+        console.log(`[DocumentDelete All] File deletion summary: ${successfulFileDeletions} succeeded, ${failedFileDeletions.length} failed.`);
+
+        // 5. Return success response
+        return res.status(200).json({
+            success: true,
+            message: `Deleted ${deletedDbCount} document records. Attempted deletion of ${attemptedFileDeletions} files (${successfulFileDeletions} successful). Check server logs for details.`,
+            deletedDbCount,
+            attemptedFileDeletions,
+            successfulFileDeletions,
+            failedFileDeletions: failedFileDeletions.length > 0 ? failedFileDeletions : undefined // Only include if failures occurred
+        });
+
+    } catch (error: any) {
+        console.error(`[DocumentDelete All] Critical error during deletion for user ${userIdString}:`, error);
+        return res.status(500).json({
+            success: false,
+            message: 'An error occurred while deleting user documents.',
+            error: error.message || String(error)
+        });
+    }
+});
+
 export default router;
