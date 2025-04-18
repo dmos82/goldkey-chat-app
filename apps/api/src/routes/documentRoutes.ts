@@ -16,6 +16,10 @@ import { upsertVectors, PineconeVector, deleteVectorsByFilter, queryVectors } fr
 
 const router: Router = express.Router();
 
+// Define path for persistent storage (from ENV variable or default)
+const USER_DOCUMENT_STORAGE_PATH = process.env.DOCUMENT_STORAGE_PATH || '/data/knowledge_base_docs';
+console.log(`[Document Routes] User document storage path set to: ${USER_DOCUMENT_STORAGE_PATH}`);
+
 // Type augmentation for custom request properties (Ideally in a types file)
 declare global {
   namespace Express {
@@ -180,7 +184,8 @@ Context:
 // Configure multer for disk storage
 const storage = multer.diskStorage({
     destination: (_req, _file, cb) => {
-        cb(null, UPLOADS_DIR);
+        // Save uploads directly to the persistent storage path
+        cb(null, USER_DOCUMENT_STORAGE_PATH);
     },
     filename: (_req, file, cb) => {
         // Generate a unique filename while preserving the original extension
@@ -610,17 +615,17 @@ router.get('/user/:documentId', protect, async (req: Request, res: Response) => 
         }
 
         // --- If all checks pass, proceed to serve file ---
-        console.log(`[DocumentServe User] Authorization PASSED for DocID: ${documentId}, UserID: ${req.user._id}`); // Add success log
+        console.log(`[DocumentServe User] Authorization PASSED for DocID: ${documentId}, UserID: ${req.user._id}`);
 
-        // Construct the full path using the saved (UUID-based) filename
-        const filePath = path.join(UPLOADS_DIR, doc.fileName);
-        console.log(`[DocumentServe User] Attempting to serve file: ${filePath}`);
+        // Construct the full path using the PERSISTENT storage path and the saved (UUID-based) filename
+        const filePath = path.join(USER_DOCUMENT_STORAGE_PATH, doc.fileName);
+        console.log(`[DocumentServe User] Attempting to serve file from persistent storage: ${filePath}`);
 
         // Check if file exists on disk
         try {
             await fs.access(filePath);
         } catch (error) {
-            console.error(`[DocumentServe User] File not found on disk: ${filePath}`);
+            console.error(`[DocumentServe User] File not found on persistent disk: ${filePath}`);
             // Optionally consider cleanup if metadata exists but file doesn't
             return res.status(404).json({ success: false, message: 'Document file not found on server.' });
         }
