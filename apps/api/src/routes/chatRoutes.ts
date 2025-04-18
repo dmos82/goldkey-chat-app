@@ -53,15 +53,21 @@ router.post('/', async (req: Request, res: Response): Promise<void | Response> =
         console.log(`[Chat] Determined sourceType for filter: ${sourceType}`);
 
         // 1. Generate embedding
-        console.log('[Chat] Generating embedding for query...');
-        const queryEmbedding = await generateEmbeddings([query]);
+        const originalQuery = query; // Preserve original query for logging/history
+        const queryForEmbedding = originalQuery.toLowerCase(); // Lowercase for embedding search
+        console.log(`[Chat RAG Debug] Original query: "${originalQuery}"`);
+        console.log(`[Chat RAG Debug] Query used for embedding: "${queryForEmbedding}"`);
+
+        console.log('[Chat] Generating embedding for lowercased query...');
+        // Use the lowercased query for embedding generation
+        const queryEmbedding = await generateEmbeddings([queryForEmbedding]);
         if (!queryEmbedding || queryEmbedding.length === 0 || queryEmbedding[0].length === 0) {
             throw new Error('Failed to generate query embedding.');
         }
         console.log('[Chat] Query embedding generated successfully.');
 
         // 2. Define filter for Pinecone query
-        const topK = 5; // Number of chunks to retrieve
+        const topK = 10; // Increased number of chunks to retrieve
         let filter: Record<string, any> = { sourceType: sourceType }; // Base filter on sourceType
         
         if (sourceType === 'user') {
@@ -194,9 +200,10 @@ router.post('/', async (req: Request, res: Response): Promise<void | Response> =
         }
 
         try {
+            // Use the ORIGINAL query for chat history persistence
             const userMessage: IChatMessage = {
                 role: 'user',
-                content: query,
+                content: originalQuery,
                 timestamp: new Date()
             };
             const assistantMessage: IChatMessage = {
