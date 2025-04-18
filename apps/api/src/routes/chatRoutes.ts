@@ -1,11 +1,10 @@
 import express, { Request, Response, Router } from 'express';
 import mongoose, { Types } from 'mongoose';
 import { protect, checkSession } from '../middleware/authMiddleware';
-import { generateEmbeddings, getChatCompletion, getChatCompletionWithHistory } from '../utils/openaiHelper';
+import { generateEmbeddings, getChatCompletion } from '../utils/openaiHelper';
 import { ChatCompletionMessageParam as OpenAIChatCompletionMessageParam } from 'openai/resources/chat';
 import { Chat, IChatMessage, IChat } from '../models/ChatModel';
 import { queryVectors } from '../utils/pineconeService';
-import { saveChatHistory, getChatHistory } from '../utils/chatHistoryService';
 
 const router: Router = express.Router();
 
@@ -146,12 +145,12 @@ router.post('/', async (req: Request, res: Response): Promise<void | Response> =
         console.log('[Chat] Received response from OpenAI.');
 
         // 7. Prepare response with DE-DUPLICATED sources
-        const uniqueSourcesMap = new Map<string, { source: string; type: 'user' | 'system', documentId: string; }>();
+        const uniqueSourcesMap = new Map<string, { fileName: string; type: 'user' | 'system', documentId: string | null; }>();
         sources.forEach(source => {
             const key = source.documentId || source.fileName; // Use docId for user, filename for system as unique key
             if (!uniqueSourcesMap.has(key)) {
                 uniqueSourcesMap.set(key, {
-                    source: source.fileName, // Use originalFileName for display
+                    fileName: source.fileName, // Use originalFileName for display
                     type: source.type,
                     documentId: source.documentId // Keep documentId (might be null for system)
                 });
@@ -160,10 +159,20 @@ router.post('/', async (req: Request, res: Response): Promise<void | Response> =
         });
         const finalSources = Array.from(uniqueSourcesMap.values());
 
-        const responseObject = {
+        // --- Update Response Object structure to match IChatMessage/Frontend expectation (if needed) ---
+        // Ensure the structure matches what IChatMessage expects for sources
+        // Example: Assuming IChatMessage source needs { source: string, ... }
+        const finalSourcesForResponse = finalSources.map(fs => ({
+          documentId: fs.documentId,
+          type: fs.type,
+          fileName: fs.fileName, // Ensure this field name is consistent
+          // Add pageNumbers if available/needed - Currently not available from this point
+        }));
+
+        const responseObject: any = {
             success: true,
             answer,
-            sources: finalSources.slice(0, 5) // Limit unique sources
+            sources: finalSourcesForResponse.slice(0, 5) // Limit unique sources, use adjusted structure
         };
         console.log('[Chat] Sending final response. Answer length:', answer.length, 'Sources count:', responseObject.sources.length);
 
@@ -183,7 +192,7 @@ router.post('/', async (req: Request, res: Response): Promise<void | Response> =
             const assistantMessage: IChatMessage = {
                 role: 'assistant',
                 content: responseObject.answer,
-                sources: responseObject.sources, // Save the processed, unique sources
+                sources: finalSourcesForResponse,
                 timestamp: new Date()
             };
 
@@ -202,23 +211,25 @@ router.post('/', async (req: Request, res: Response): Promise<void | Response> =
                 const chatTitle = query.substring(0, 40) + (query.length > 40 ? '...' : '');
                 chat = new Chat({
                     userId: new mongoose.Types.ObjectId(userId.toString()),
-                    title: chatTitle, // Use first part of query as title
-                        messages: [userMessage, assistantMessage]
-                    });
+                    title: chatTitle,
+                    messages: [userMessage, assistantMessage]
+                });
                 console.log(`[Chat Persistence] New chat object created with ID ${chat._id}`);
             }
 
             await chat.save();
             console.log(`[Chat Persistence] Chat ${chat._id} saved successfully.`);
 
-            // Include the chatId in the response
-            responseObject.chatId = chat._id.toString();
+            // Include the chatId in the response, checking if chat and _id exist
+            if (chat?._id) {
+              responseObject.chatId = chat._id.toString();
+            } else {
+              console.warn('[Chat Persistence] Chat or chat._id was unexpectedly undefined after save.');
+            }
 
         } catch (dbError: any) {
             console.error('[Chat Persistence] Error saving chat to database:', dbError);
-            // Don't fail the entire request, just log the error. 
-            // The user still got their answer.
-            // Consider adding a flag to the response indicating persistence failure?
+            // Add flag to the response (responseObject is already 'any')
             responseObject.persistenceError = 'Failed to save chat history.';
         }
         // --- End Chat Persistence Logic ---
