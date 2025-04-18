@@ -20,6 +20,7 @@ import { generateEmbeddings } from '../utils/openaiHelper';
 import { extractPdfTextWithPages, chunkTextWithPages } from '../utils/pdfUtils'; // Reusing utils
 // Import Pinecone service functions
 import { upsertVectors, deleteVectorsByFilter, PineconeVector } from '../utils/pineconeService';
+import fsPromises from 'fs/promises'; // Ensure fs/promises is imported
 
 const router: Router = express.Router();
 
@@ -415,6 +416,89 @@ router.put('/users/:userId/role', async (req, res) => {
 router.get('/users/:userId', async (req, res) => {
     // Example: Logic for getting user by ID
     res.status(501).json({ message: "Get user by ID endpoint not fully implemented" });
+});
+
+// --- NEW ROUTE: Delete All System KB Documents ---
+router.delete('/system-kb/all', protect, isAdmin, async (req: Request, res: Response) => {
+    const adminUserId = req.user?._id;
+    const adminUsername = req.user?.username;
+
+    console.log(`[Admin Delete All System KB] Request received from admin: ${adminUsername} (ID: ${adminUserId})`);
+
+    let deletedDbCount = 0;
+    let attemptedFileDeletions = 0;
+    let successfulFileDeletions = 0;
+    let failedFileDeletions: string[] = [];
+
+    try {
+        // 1. Find all system document metadata to get filenames
+        const documentsToDelete = await UserDocument.find({
+            sourceType: 'system' // Filter for system documents
+        }).select('fileName');
+
+        const fileNamesToDelete = documentsToDelete.map(doc => doc.fileName).filter(Boolean);
+        attemptedFileDeletions = fileNamesToDelete.length;
+        console.log(`[Admin Delete All System KB] Found ${documentsToDelete.length} system records and ${attemptedFileDeletions} filenames.`);
+
+        if (documentsToDelete.length === 0) {
+            return res.status(200).json({ success: true, message: 'No system documents found to delete.', deletedDbCount: 0, attemptedFileDeletions: 0 });
+        }
+
+        // 2. Delete DB records
+        console.log(`[Admin Delete All System KB] Deleting ${documentsToDelete.length} records from MongoDB...`);
+        const dbResult = await UserDocument.deleteMany({
+            sourceType: 'system'
+        });
+        deletedDbCount = dbResult.deletedCount;
+        console.log(`[Admin Delete All System KB] Successfully deleted ${deletedDbCount} system records from MongoDB.`);
+
+        // 3. Delete Pinecone vectors (fire-and-forget style with error logging)
+        console.log(`[Admin Delete All System KB] Initiating Pinecone vector deletion for sourceType: system...`);
+        deleteVectorsByFilter({ sourceType: 'system' })
+            .then(() => {
+                console.log(`[Admin Delete All System KB] Pinecone vector deletion successfully initiated for sourceType: system.`);
+            })
+            .catch(pineconeError => {
+                console.error(`[Admin Delete All System KB] Error initiating Pinecone vector deletion for sourceType: system:`, pineconeError);
+            });
+
+        // 4. Delete physical files
+        console.log(`[Admin Delete All System KB] Attempting to delete ${attemptedFileDeletions} physical files from ${KNOWLEDGE_BASE_DIR}...`);
+        for (const fileName of fileNamesToDelete) {
+            const filePath = path.join(KNOWLEDGE_BASE_DIR, fileName);
+            try {
+                await fsPromises.unlink(filePath);
+                console.log(`[Admin Delete All System KB] Successfully deleted file: ${filePath}`);
+                successfulFileDeletions++;
+            } catch (fileError: any) {
+                if (fileError.code === 'ENOENT') {
+                    console.warn(`[Admin Delete All System KB] File not found (possibly already deleted): ${filePath}`);
+                } else {
+                    console.error(`[Admin Delete All System KB] Failed to delete file ${filePath}:`, fileError);
+                    failedFileDeletions.push(fileName);
+                }
+            }
+        }
+        console.log(`[Admin Delete All System KB] File deletion summary: ${successfulFileDeletions} succeeded, ${failedFileDeletions.length} failed.`);
+
+        // 5. Return success response
+        return res.status(200).json({
+            success: true,
+            message: `Deleted ${deletedDbCount} system document records. Attempted deletion of ${attemptedFileDeletions} files (${successfulFileDeletions} successful). Check server logs for details.`,
+            deletedDbCount,
+            attemptedFileDeletions,
+            successfulFileDeletions,
+            failedFileDeletions: failedFileDeletions.length > 0 ? failedFileDeletions : undefined
+        });
+
+    } catch (error: any) {
+        console.error(`[Admin Delete All System KB] Critical error during deletion requested by admin ${adminUsername} (ID: ${adminUserId}):`, error);
+        return res.status(500).json({
+            success: false,
+            message: 'An error occurred while deleting system documents.',
+            error: error.message || String(error)
+        });
+    }
 });
 
 export default router; 
