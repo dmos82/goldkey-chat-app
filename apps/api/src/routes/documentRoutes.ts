@@ -320,10 +320,6 @@ router.post('/upload', protect, checkSession, upload.single('file'), async (req:
         await UserDocument.findByIdAndUpdate(documentId, { status: 'completed' });
         console.log(`[Upload] Updated document ${documentId} status to 'completed'.`);
 
-        // Clean up temporary file
-        await fs.unlink(file.path);
-        console.log(`[Upload] Deleted temporary file: ${file.path}`);
-
         return res.status(201).json({
             success: true, 
             message: `Document '${originalFileName}' uploaded and processed successfully.`,
