@@ -583,9 +583,6 @@ router.get('/user/:documentId', protect, async (req: Request, res: Response) => 
             return res.status(404).json({ success: false, message: 'Document metadata not found.' });
         }
 
-        // --- Authorization Check (Example - Adjust as needed) ---
-        // Check if the requesting user owns this document
-        // Ensure req.user is populated by your 'protect' middleware
         // Add explicit check for req.user before accessing _id
         if (!req.user) { 
              // This case should technically be handled by 'protect', but satisfy TS
@@ -593,8 +590,15 @@ router.get('/user/:documentId', protect, async (req: Request, res: Response) => 
              return res.status(401).json({ success: false, message: 'Authentication context missing.' });
         } 
         // Add assertion req.user! since the check above guarantees it's not null
-        if (doc.sourceType !== 'user' || !doc.userId || doc.userId.toString() !== req.user!._id) { 
-            console.warn(`[DocumentServe User] Unauthorized attempt to access document ${documentId} by user ${req.user!._id}`); // Also assert here
+        
+        // --- ADD LOGGING BEFORE COMPARISON ---
+        const requestUserId = req.user!._id;
+        const documentUserId = doc.userId;
+        console.log(`[DocumentServe User - Auth Check] Comparing Request User ID (${typeof requestUserId}): ${requestUserId} with Document User ID (${typeof documentUserId}): ${documentUserId}`);
+        // --- END LOGGING BEFORE COMPARISON ---
+        
+        if (doc.sourceType !== 'user' || !documentUserId || documentUserId.toString() !== requestUserId.toString()) { // Ensure both are strings for comparison 
+            console.warn(`[DocumentServe User] Unauthorized attempt! DocType: ${doc.sourceType}, DocUserID: ${documentUserId?.toString()}, ReqUserID: ${requestUserId?.toString()}`); // Log values on failure
             return res.status(403).json({ success: false, message: 'Forbidden: You do not have access to this document.' });
         }
         // -------------------------------------------------------
