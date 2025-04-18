@@ -5,6 +5,8 @@ import PdfViewerModal from './PdfViewerModal';
 import { useAuth } from '@/context/AuthContext';
 import { Message, Source } from '@/types'; // Import types from centralized location
 import { API_BASE_URL } from '@/lib/config';
+import { Button } from '@/components/ui/button';
+import { FileText } from 'lucide-react';
 
 // Define search mode type
 type SearchMode = 'system' | 'user';
@@ -14,7 +16,7 @@ interface ChatInterfaceProps {
   chatId: string | null; // ID of the currently active chat, null for a new chat
   messages: Message[]; // Messages for the current chat, passed from parent
   isLoadingMessages: boolean; // Whether messages are being loaded (for history)
-  onSourceClick?: (docId: string, sourceType: 'system' | 'user', initialPage?: number, originalFileName?: string) => void;
+  onSourceClick?: (source: Source) => void;
   chatContext: 'system-kb' | 'user-docs'; // Add chatContext prop
   onNewMessages: (userQuery: string, apiResponseData: any) => void; // Renamed and updated prop
 }
@@ -156,31 +158,26 @@ export default function ChatInterface({
                 ) : (
                   <p className="text-sm whitespace-pre-wrap text-black dark:text-white">{msg.text}</p>
                 )}
-                {msg.sender === 'assistant' && msg.sources && msg.sources.length > 0 && (
-                  <div className="mt-2 pt-2 border-t border-border-light dark:border-border-dark">
-                    <p className="text-xs text-text-secondary-light dark:text-text-secondary-dark mb-1 font-medium">Sources:</p>
-                    <ul className="list-none pl-0 text-xs text-text-secondary-light dark:text-text-secondary-dark space-y-1">
-                      {msg.sources.map((source, idx) => (
-                        <li key={`${source.source}-${idx}`} className="flex items-start">
-                          <button
-                            onClick={() => onSourceClick?.(source.documentId!, source.type, source.pageNumbers?.[0], source.source)}
-                            className="text-link-light dark:text-link-dark hover:underline cursor-pointer text-left flex-1 break-words"
-                            title={`Open ${source.source} (Page ${source.pageNumbers?.[0] || 1})`}
-                            disabled={!source.documentId} 
-                          >
-                            <span className="font-medium">{source.source || 'Unknown File'}</span>
-                            {source.pageNumbers && source.pageNumbers.length > 0 && (
-                              <span className="ml-1 text-text-tertiary-light dark:text-text-tertiary-dark">
-                                (Page{source.pageNumbers.length > 1 ? 's' : ''}: {source.pageNumbers.join(', ')})
-                              </span>
-                            )}
-                            <span className="ml-1 text-xs text-text-tertiary-light dark:text-text-tertiary-dark">
-                              [{source.type === 'system' ? 'System KB' : 'My Docs'}]
-                            </span>
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
+                {msg.sources && msg.sources.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-2 items-center text-xs">
+                    <span className="font-semibold mr-1">Sources:</span>
+                    {msg.sources.map((source, idx) => {
+                      return (
+                        <Button
+                          key={`source-${msg._id}-${idx}`}
+                          variant="outline"
+                          size="sm"
+                          className="h-auto px-2 py-1 text-xs border-primary/50 hover:bg-primary/10"
+                          onClick={() => {
+                            onSourceClick?.(source);
+                          }}
+                          disabled={!source.documentId}
+                        >
+                          <FileText className="w-3 h-3 mr-1" />
+                          {source.source || 'Unknown File'} {source.pageNumbers?.length ? `(p. ${source.pageNumbers.join(', ')})` : ''}
+                        </Button>
+                      );
+                    })}
                   </div>
                 )}
               </div>

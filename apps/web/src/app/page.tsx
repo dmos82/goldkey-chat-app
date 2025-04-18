@@ -22,7 +22,7 @@ import PdfViewerModal from '@/components/PdfViewerModal'; // Reverted to Alias P
 import { MainLayout } from '@/components/layout/MainLayout'; // Reverted to Alias Path
 import { fetchDocuments, fetchChatList, fetchChatDetails } from '@/lib/api'; // Added chat API calls
 // --- Import types from @/types --- 
-import { Document, Message, ChatSummary, ChatDetail } from '@/types'; // Import required types from @/types
+import { Document, Message, ChatSummary, ChatDetail, Source } from '@/types'; // Import required types from @/types
 import { useToast } from "@/components/ui/use-toast"; // Import useToast
 import { useInactivityTimer } from "@/hooks/useInactivityTimer"; // Import the new hook
 import { API_BASE_URL } from '@/lib/config';
@@ -208,14 +208,27 @@ export default function Home() {
     setModalTitle('');
   }, [modalFileUrl]); // Added useCallback
 
-  const handleFileClick = useCallback(async (docId: string, sourceType: 'system' | 'user', originalFileName: string, initialPage?: number, chunkText?: string) => {
-    console.log(`[Home] handleFileClick: docId=${docId}, sourceType=${sourceType}, fileName=${originalFileName}, page=${initialPage}`);
+  const handleFileClick = useCallback(async (source: Source) => {
+    // Extract data from the source object
+    const docId = source.documentId;
+    const sourceType = source.type;
+    const originalFileName = source.source; // Use source.source as the filename
+    const initialPage = source.pageNumbers?.[0];
+    // Assuming chunkText isn't directly available on Source, pass undefined or derive if needed
+    const chunkText = undefined; 
+    
+    console.log(`[Home] handleFileClick received source:`, JSON.stringify(source, null, 2)); // Log the received object
+    
     if (!token) { console.error("No auth token found!"); return; }
+    if (!docId) { console.error("Source is missing documentId!", source); return; }
 
     let endpoint = '';
     if (sourceType === 'system') endpoint = `/api/system-kb/download/${docId}`; 
     else if (sourceType === 'user') endpoint = `/api/documents/user/${docId}`; 
-    else return;
+    else {
+      console.error('Invalid sourceType in handleFileClick:', sourceType);
+      return; // Handle invalid type
+    }
 
     try {
         const response = await fetch(`${API_BASE_URL}${endpoint}`, { headers: { 'Authorization': `Bearer ${token}` } });
@@ -223,7 +236,12 @@ export default function Home() {
         if (!response.ok) { 
              console.error(`Failed to fetch ${sourceType} doc: ${response.status}`);
              if (response.status === 401 && logout) logout(); 
-             alert(`Error fetching document: ${response.statusText}`); 
+             // Use toast instead of alert
+             toast({ 
+                variant: "destructive",
+                title: "Error Fetching Document",
+                description: `Status: ${response.status} ${response.statusText}`
+             });
              return;
         }
         
@@ -235,7 +253,8 @@ export default function Home() {
             // It's a PDF, proceed with viewer
             const blob = await response.blob();
             const blobUrl = URL.createObjectURL(blob);
-            openModal(blobUrl, initialPage, chunkText, originalFileName);
+            // Pass extracted data to openModal, especially originalFileName
+            openModal(blobUrl, initialPage, chunkText, originalFileName); 
         } else {
             // Not a PDF - Handle differently (e.g., direct download or message)
             console.warn(`[handleFileClick] Non-PDF content type received (${contentType}). Attempting direct download.`);
@@ -257,11 +276,16 @@ export default function Home() {
              URL.revokeObjectURL(blobUrl); // Clean up blob URL after download starts
         }
 
-    } catch (error) {
+    } catch (error: any) {
         console.error('Error fetching/processing document:', error);
-        alert('An error occurred while loading the document.'); 
+        // Use toast for general errors
+        toast({ 
+            variant: "destructive",
+            title: "Error",
+            description: error.message || 'An error occurred while loading the document.'
+        });
     }
-  }, [token, openModal, logout, toast]); // Added toast dependency
+  }, [token, openModal, logout, toast]); // Dependencies updated
 
   // --- Chat History Handlers ---
   const handleNewChat = () => {
@@ -286,34 +310,33 @@ export default function Home() {
     console.log('[handleNewMessages] Received Data:', { userQuery, apiResponseData }); // Log input
 
     // Construct messages
-    // RE-ADD DETAILED LOGGING FOR DEBUGGING REGRESSION
-    const userMessage: Message = { 
+    const userMessage: Message = {
         _id: `user-temp-${Date.now()}`, // Add temporary ID
-        sender: 'user' as const, 
-        text: userQuery, 
-        sources: [], 
-        timestamp: new Date().toISOString() 
+        sender: 'user' as const, // Use 'sender'
+        text: userQuery,
+        sources: [],
+        timestamp: new Date().toISOString()
     };
-    const assistantMessage: Message = { 
+    const assistantMessage: Message = {
         _id: apiResponseData.messageId || `asst-temp-${Date.now()}`, // Add temporary/API ID
-        sender: 'assistant' as const, 
+        sender: 'assistant' as const, // Use 'sender'
         text: apiResponseData.answer,      // Correct key based on logs for the second message
         sources: apiResponseData.sources?.map((s: any) => ({ // Assuming source structure
-            source: s.source, 
-            pageNumbers: s.pageNumbers, 
-            documentId: s.documentId,
-            type: s.type
+            source: s.fileName || 'Unknown File', // Add default
+            pageNumbers: s.pageNumbers || [], // Add default
+            documentId: s.documentId || '', // Add default
+            type: s.type || 'unknown', // Add default
+            // _id might not exist on source, removed if not part of type
         })) || [],
         timestamp: new Date().toISOString()
     };
 
     setCurrentMessages(prevMessages => {
-      console.log('[handleNewMessages] Previous Messages State:', prevMessages); // Log state BEFORE update
-      // Calculate the next state for logging BEFORE returning it
       const nextMessages = [...prevMessages, userMessage, assistantMessage];
-      console.log('[handleNewMessages] Calculated New Messages State:', nextMessages); // Log the calculated new state
-      return nextMessages; // Return the calculated new state
+      return nextMessages;
     });
+
+    setIsLoadingMessages(false); // Use the correct state setter
 
     // If this was the first message in a new chat, we need the new chat ID
     // and need to refresh the chat list and select the new chat
@@ -381,7 +404,7 @@ export default function Home() {
         setActiveView={setActiveView}
         isKbOverlayVisible={isKbOverlayVisible}
         setIsKbOverlayVisible={setIsKbOverlayVisible}
-        handleKbFileClick={(docId, sourceType, fileName) => handleFileClick(docId, sourceType, fileName)}
+        handleKbFileClick={(docId, sourceType, fileName) => handleFileClick({ documentId: docId, type: sourceType, source: fileName })}
         chatContext={chatContext}
         setChatContext={setChatContext}
         // Pass chat state and handlers to MainLayout (for sidebar)
@@ -411,7 +434,8 @@ export default function Home() {
                   chatId={selectedChatId} // Pass selected chat ID
                   messages={currentMessages} // Pass current messages
                   isLoadingMessages={isLoadingMessages} // Pass loading state
-                  onSourceClick={(docId, sourceType, page, fileName) => handleFileClick(docId, sourceType, fileName || 'Unknown File', page)}
+                  // Pass the updated handleFileClick
+                  onSourceClick={handleFileClick} 
                   chatContext={chatContext}
                   onNewMessages={handleNewMessages} // Pass renamed handler
               />
@@ -429,7 +453,7 @@ export default function Home() {
                   <div className="bg-card dark:bg-card rounded-md p-4 shadow"> 
                      <DocumentList
                         key={refreshKey}
-                        onOpenFile={(docId: string, fileName: string) => handleFileClick(docId, 'user', fileName)} 
+                        onOpenFile={(docId: string, fileName: string) => handleFileClick({ documentId: docId, type: 'user', source: fileName })} 
                       />
                   </div>
               </div>
