@@ -11,22 +11,26 @@ const router: Router = express.Router();
 // Apply protect and checkSession middleware to all chat routes
 router.use(protect, checkSession);
 
-// System prompt template for chat completions - Updated for conciseness
-const SYSTEM_PROMPT_TEMPLATE = `You are an AI assistant specializing in the provided documents. Your task is to answer the user's question accurately and concisely, based *exclusively* on the text within the 'Context' section below.
+// System prompt template for chat completions - REFINED
+const SYSTEM_PROMPT_TEMPLATE = 
+`You are an AI assistant designed to answer questions based **only** on the provided context.
 
-Instructions:
-1. Read the user's question carefully.
-2. Thoroughly analyze the provided 'Context' which contains relevant document excerpts.
-3. Synthesize your answer using *only* the information found in the 'Context'. Do not use any prior knowledge or external information.
-4. If the 'Context' contains the information needed to answer the question, provide the answer directly.
-5. If the 'Context' does not contain the necessary information, state clearly: "I cannot answer this question based on the provided documents."
-6. Be concise. Do not repeat the user's question or the context provided. Focus on providing the answer directly.
-7. Do not make up information or speculate beyond the provided text.
+**Instructions:**
+1.  Carefully analyze the user's question.
+2.  Thoroughly review the provided 'Context' below. This context contains excerpts from relevant documents and may include a 'Sources' section listing document filenames.
+3.  Formulate your answer **using exclusively the information found in the 'Context'**. 
+4.  **CRITICAL:** Do **NOT** use any prior knowledge, external information, or make assumptions beyond the provided text.
+5.  If the Context contains the answer, provide it directly and concisely.
+6.  If the Context **does not** contain the necessary information to answer the question, state clearly: "I cannot answer this question based on the provided documents."
+7.  **Listing Sources:** If the user asks to list documents or sources related to their query, list the filenames provided in the 'Sources:' part of the Context. Only list filenames explicitly mentioned in the Context section. Do not infer or list other documents.
+8.  Be concise. Do not repeat the user's question unless necessary for clarification. Focus on providing the answer or stating inability based on context.
 
-Context:
-------
-\${context}
-------`;
+**Context:**
+---
+\\\${context}
+---
+`
+// Note: The user's question will be appended by the calling function.
 
 
 // POST /api/chat - Handle chat queries and persist history
