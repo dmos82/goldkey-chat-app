@@ -195,13 +195,22 @@ export default function Home() {
             // --- ADDED Deduplication Logic ---
             const uniqueMessages = combined.reduce((acc, current) => {
                 // Find index of potential duplicate in accumulator
-                const existingIndex = acc.findIndex(msg =>
-                    // Match by ID primarily if both messages have one
-                    (msg._id && current._id && msg._id === current._id) ||
-                    // Fallback for optimistic: match by timestamp & sender if IDs are missing
-                    // (Adjust this heuristic if timestamps aren't precise enough)
-                    (!msg._id && !current._id && msg.timestamp === current.timestamp && msg.sender === current.sender)
-                );
+                const existingIndex = acc.findIndex(msg => {
+                    // 1. Match by ID if both exist
+                    if (msg._id && current._id) {
+                        return msg._id === current._id;
+                    }
+                    // 2. Match by sender and close timestamp (e.g., within 3 seconds)
+                    //    Handles optimistic (no ID) vs fetched (has ID)
+                    if (msg.sender === current.sender && msg.timestamp && current.timestamp) {
+                         const timeDiff = Math.abs(new Date(msg.timestamp).getTime() - new Date(current.timestamp).getTime());
+                         // Allow matching even if one has ID and other doesn't, if sender/time match
+                         if (timeDiff < 3000) { // 3-second threshold (adjust if needed)
+                             return true;
+                         }
+                    }
+                    return false; // No match
+                });
 
                 if (existingIndex > -1) {
                     // Duplicate found. Prioritize keeping the version with 'usage' data.
