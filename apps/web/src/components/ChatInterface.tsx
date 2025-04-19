@@ -169,11 +169,11 @@ export default function ChatInterface({
                     )}
 
                     {/* --- START: Display Usage/Cost for Assistant Messages --- */}
-                    {msg.sender === 'assistant' && msg.usage && typeof msg.cost === 'number' && (
+                    {msg.sender === 'assistant' && msg.usage && typeof msg.cost === 'number' ? (
                       <TooltipProvider delayDuration={300}>
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <div className="mt-2 pt-1 border-t border-gray-300 dark:border-gray-600 bg-red-500 border-4 border-lime-400">
+                            <div className="mt-2 pt-1 border-t border-gray-300 dark:border-gray-600">
                               <p className="text-xs text-gray-500 dark:text-gray-400">
                                 Usage: {msg.usage.total_tokens} tokens | Cost: ${msg.cost.toFixed(6)}
                               </p>
@@ -185,6 +185,15 @@ export default function ChatInterface({
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
+                    ) : (
+                      // *** ADDED: Log when condition fails for assistant message ***
+                      // Execute log, then explicitly return null
+                      (() => { 
+                          if (msg.sender === 'assistant') {
+                              console.log(`[Debug Render Cond Fail] sender: ${msg.sender}, usage: ${!!msg.usage}, costType: ${typeof msg.cost}`);
+                          }
+                          return null;
+                      })()
                     )}
                     {/* --- END: Display Usage/Cost --- */}
 
