@@ -159,7 +159,10 @@ export default function Home() {
         const chatDetails: ChatDetail = await fetchChatDetails(selectedChatId, token);
         console.log('[Effect loadMessages] Received chatDetails:', chatDetails); // Log fetched data
 
-        const newMessages: Message[] = chatDetails.messages.map(msg => ({ 
+        // --- CORRECTED MAPPING & MERGE LOGIC ---
+        // Map messages from API response (using FrontendChatMessage structure)
+        const newMessagesFromApi = chatDetails.messages.map(msg => ({
+            _id: (msg as any)._id, // Attempt to access _id if it exists, maybe type needs update?
             sender: msg.role,
             text: msg.content,
             sources: msg.sources?.map(s => ({
@@ -167,14 +170,36 @@ export default function Home() {
                 pageNumbers: s.pageNumbers,
                 documentId: s.documentId,
                 type: s.type
-            })) || [], // Ensure sources is always an array
-            // Add timestamp if available and needed in Message type
+            })) || [],
+            // Assume usage/cost aren't part of FrontendChatMessage type yet - handle in UI only?
+            // usage: (msg as any).usage || null, 
+            // cost: (msg as any).cost !== undefined ? (msg as any).cost : null,
+            usage: null, // Set to null for historical messages if not in type
+            cost: null, // Set to null for historical messages if not in type
             timestamp: msg.timestamp ? new Date(msg.timestamp).toISOString() : new Date().toISOString()
         }));
-        
-        console.log('[Effect loadMessages] Preparing to set messages:', newMessages); // Log messages before setting state
-        setCurrentMessages(newMessages); 
-        console.log('[Effect loadMessages] State updated with messages.'); // Log after setting state
+
+        // --- Use functional update to merge fetched and optimistic messages ---
+        setCurrentMessages(prevMessages => {
+            // Identify optimistic messages: those in prevMessages not having a matching _id in newMessagesFromApi
+            const optimisticMessages = prevMessages.filter(
+                // Ensure both _ids exist before comparing
+                pMsg => pMsg._id && !newMessagesFromApi.some(apiMsg => apiMsg._id && apiMsg._id === pMsg._id)
+            );
+
+            // Combine the fetched messages with the unique optimistic ones
+            const combinedMessages = [
+                ...newMessagesFromApi,
+                ...optimisticMessages
+            ];
+
+            console.log(`[loadMessages] Merged ${newMessagesFromApi.length} fetched with ${optimisticMessages.length} optimistic messages. Total: ${combinedMessages.length}`);
+            // Sort combined messages by timestamp to ensure correct order
+            return combinedMessages.sort((a, b) => 
+                new Date(a.timestamp || 0).getTime() - new Date(b.timestamp || 0).getTime()
+            );
+        });
+        console.log('[Effect loadMessages] State update queued with merged messages.'); // Log after setting state
 
       } catch (error: any) {
         console.error(`Error fetching messages for chat ${selectedChatId}:`, error);
@@ -194,10 +219,10 @@ export default function Home() {
       }
     };
 
-    // Call the async function
     // --- TEMPORARILY DISABLED FOR DEBUGGING ---
     // loadMessages();
     // -----------------------------------------
+    loadMessages(); // <-- RESTORED THIS CALL
 
   }, [selectedChatId, token, logout]); // Dependencies
 
