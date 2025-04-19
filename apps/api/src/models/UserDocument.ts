@@ -81,7 +81,11 @@ userDocumentSchema.methods.toJSON = function() {
 };
 
 // Indexing recommendations
-// Index for finding user's documents
+// Index for finding user's documents (already exists)
 userDocumentSchema.index({ userId: 1, sourceType: 1 });
+// Index for System KB keyword search (Hybrid Search)
+userDocumentSchema.index({ sourceType: 1, originalFileName: 1 });
+// Index for User Docs keyword search (Hybrid Search)
+userDocumentSchema.index({ userId: 1, sourceType: 1, originalFileName: 1 });
 
 export const UserDocument = mongoose.model<IUserDocument>('UserDocument', userDocumentSchema); 
