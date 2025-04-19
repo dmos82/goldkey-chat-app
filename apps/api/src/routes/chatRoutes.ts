@@ -5,6 +5,7 @@ import { generateEmbeddings, getChatCompletion } from '../utils/openaiHelper';
 import { ChatCompletionMessageParam as OpenAIChatCompletionMessageParam } from 'openai/resources/chat';
 import { Chat, IChatMessage, IChat } from '../models/ChatModel';
 import { queryVectors } from '../utils/pineconeService';
+import { UserDocument } from '../models/UserDocument'; // Import UserDocument model
 
 const router: Router = express.Router();
 
@@ -66,88 +67,147 @@ router.post('/', async (req: Request, res: Response): Promise<void | Response> =
         }
         console.log('[Chat] Query embedding generated successfully.');
 
-        // 2. Define filter for Pinecone query
-        const topK = 10; // Increased number of chunks to retrieve
-        let filter: Record<string, any> = { sourceType: sourceType }; // Base filter on sourceType
+        // --- START HYBRID SEARCH --- 
         
-        if (sourceType === 'user') {
-            filter.userId = userId.toString(); // Add userId filter ONLY for user documents
-            console.log(`[Chat] Applying user-specific filter: ${JSON.stringify(filter)}`);
-            } else {
-            console.log(`[Chat] Applying system-only filter: ${JSON.stringify(filter)}`);
+        // 2a. Keyword Search (MongoDB)
+        const KEYWORD_SEARCH_LIMIT = 5; // Max documents to fetch via keyword search
+        let keywordDocIds: string[] = [];
+        try {
+            console.log(`[Chat Hybrid] Performing keyword search for: "${queryForEmbedding}"`);
+            const keywordFilter: mongoose.FilterQuery<any> = {
+                sourceType: sourceType,
+                originalFileName: { $regex: queryForEmbedding, $options: 'i' } // Case-insensitive regex search
+                // Consider adding $text search if text index is properly configured: { $text: { $search: queryForEmbedding } }
+            };
+            if (sourceType === 'user') {
+                keywordFilter.userId = userId;
+            }
+            const keywordDocs = await UserDocument.find(keywordFilter)
+                .select('_id originalFileName') // Select only necessary fields
+                .limit(KEYWORD_SEARCH_LIMIT)
+                .lean(); // Use lean for performance
+
+            keywordDocIds = keywordDocs.map(doc => doc._id.toString());
+            console.log(`[Chat Hybrid] Keyword search found ${keywordDocs.length} potential documents:`, keywordDocs.map(d => d.originalFileName));
+        } catch (mongoError: any) {
+            console.error('[Chat Hybrid] Error during MongoDB keyword search:', mongoError);
+            // Non-fatal, continue with semantic search
         }
         
-        // 3. Query Pinecone
-        console.log(`[Chat] Querying Pinecone with topK=${topK}, filter: ${JSON.stringify(filter)}`);
-        const queryResults = await queryVectors(queryEmbedding[0], topK, filter);
-        console.log(`[Chat] Pinecone query completed.`);
-
-        // Extract context and sources from Pinecone results
-        let context = '';
-        const sources: any[] = []; 
-        if (queryResults && queryResults.matches && queryResults.matches.length > 0) {
-            console.log(`[Chat] Pinecone returned ${queryResults.matches.length} matches.`);
-            context = queryResults.matches
-                .map((match: any) => match.metadata?.text || '') 
-                .join('\n\n---\n\n'); 
-
-            // Store metadata for source referencing
-            queryResults.matches.forEach((match: any) => {
-                if (match.metadata) {
-                    const source = {
-                        id: match.id, 
-                        score: match.score,
-                        fileName: match.metadata.originalFileName || 'Unknown File',
-                        documentId: match.metadata.documentId || null,
-                        chunkIndex: typeof match.metadata.chunkIndex === 'number' ? match.metadata.chunkIndex : -1,
-                        type: match.metadata.sourceType || sourceType // Use metadata sourceType if available, else fallback
-                    };
-                    if (source.documentId || (source.type === 'system' && source.fileName !== 'Unknown File')) {
-                         sources.push(source);
-                    }
-                }
-            });
-            
-            if (!context.trim()) {
-                 console.warn("[Chat] Pinecone matches found, but no text content in metadata.");
-            }
+        // 2b. Semantic Search (Pinecone)
+        const SEMANTIC_SEARCH_TOP_K = 15; // Fetch slightly more results for potential boosting
+        let pineconeFilter: Record<string, any> = { sourceType: sourceType }; 
+        if (sourceType === 'user') {
+            pineconeFilter.userId = userId.toString();
+            console.log(`[Chat] Applying user-specific filter for Pinecone: ${JSON.stringify(pineconeFilter)}`);
         } else {
-            console.log('[Chat] No relevant document chunks found in Pinecone for the query.');
+            console.log(`[Chat] Applying system-only filter for Pinecone: ${JSON.stringify(pineconeFilter)}`);
+        }
+        
+        console.log(`[Chat Hybrid] Querying Pinecone with topK=${SEMANTIC_SEARCH_TOP_K}, filter: ${JSON.stringify(pineconeFilter)}`);
+        const queryResults = await queryVectors(queryEmbedding[0], SEMANTIC_SEARCH_TOP_K, pineconeFilter);
+        console.log(`[Chat Hybrid] Pinecone query completed. Found ${queryResults?.matches?.length ?? 0} semantic matches initially.`);
+
+        // 3. Combine and Rank Results
+        const KWD_BOOST_FACTOR = 1.5; // Multiplier for scores of keyword-matched results
+        const FINAL_CONTEXT_LIMIT = 7; // Max sources/chunks for final context
+        
+        let combinedSources: any[] = [];
+        if (queryResults && queryResults.matches && queryResults.matches.length > 0) {
+            combinedSources = queryResults.matches.map((match: any) => {
+                const docId = match.metadata?.documentId;
+                const isKeywordMatch = docId && keywordDocIds.includes(docId);
+                const boostedScore = isKeywordMatch ? (match.score * KWD_BOOST_FACTOR) : match.score;
+
+                return {
+                    id: match.id,
+                    score: match.score, // Original semantic score
+                    boostedScore: boostedScore, // Score after potential keyword boost
+                    isKeywordMatch: isKeywordMatch,
+                    text: match.metadata?.text || '',
+                    fileName: match.metadata?.originalFileName || 'Unknown File',
+                    documentId: docId || null,
+                    chunkIndex: typeof match.metadata?.chunkIndex === 'number' ? match.metadata.chunkIndex : -1,
+                    type: match.metadata?.sourceType || sourceType
+                };
+            });
+
+            // Sort by boosted score (descending)
+            combinedSources.sort((a, b) => b.boostedScore - a.boostedScore);
+            console.log(`[Chat Hybrid] Sorted combined sources by boosted score. Top score: ${combinedSources[0]?.boostedScore}, Keyword match: ${combinedSources[0]?.isKeywordMatch}`);
+
+        } else {
+            console.log('[Chat Hybrid] No semantic matches found.');
+            // If keyword search found results, we might consider fetching their content here
+            // For simplicity now, we proceed without context if semantic search fails
+        }
+        
+        // --- END HYBRID SEARCH --- 
+
+        // 4. Build Context and Final Sources from Combined Results
+        let context = '';
+        const finalSourcesForLlm: any[] = [];
+        const seenDocumentIds = new Set<string>();
+
+        console.log(`[Chat RAG] Building final context from top ${FINAL_CONTEXT_LIMIT} sources...`);
+        for (const source of combinedSources) {
+             if (finalSourcesForLlm.length >= FINAL_CONTEXT_LIMIT) {
+                 console.log(`[Chat RAG] Reached final context limit (${FINAL_CONTEXT_LIMIT}).`);
+                 break;
+             }
+             // Deduplicate based on documentId (take the highest-ranked chunk for each doc)
+             if (source.documentId && !seenDocumentIds.has(source.documentId)) {
+                if (source.text) {
+                    context += source.text + '\n\n---\n\n';
+                    finalSourcesForLlm.push(source);
+                    seenDocumentIds.add(source.documentId);
+                     console.log(`[Chat RAG] Added source: ${source.fileName} (DocID: ${source.documentId}, Chunk: ${source.chunkIndex}, Score: ${source.boostedScore.toFixed(4)}, Keyword: ${source.isKeywordMatch})`);
+                } else {
+                     console.warn(`[Chat RAG] Source ${source.fileName} (DocID: ${source.documentId}) has no text content, skipping.`);
+                }
+             } else if (!source.documentId && source.fileName !== 'Unknown File' && !seenDocumentIds.has(source.fileName)) {
+                 // Handle legacy system docs without documentId but with filename
+                 if (source.text) {
+                     context += source.text + '\n\n---\n\n';
+                     finalSourcesForLlm.push(source);
+                     seenDocumentIds.add(source.fileName); // Use filename as key for older docs
+                     console.log(`[Chat RAG] Added legacy source: ${source.fileName} (Chunk: ${source.chunkIndex}, Score: ${source.boostedScore.toFixed(4)}, Keyword: ${source.isKeywordMatch})`);
+                 } else {
+                      console.warn(`[Chat RAG] Legacy Source ${source.fileName} has no text content, skipping.`);
+                 }
+             }
         }
 
         if (!context.trim()) {
-            console.log('[Chat] No context found. Responding based on general knowledge (or returning specific message).');
-            context = `No relevant context found in ${sourceType === 'user' ? 'user' : 'system'} documents.`; // Provide placeholder context
+            console.log('[Chat RAG] No relevant context found after processing hybrid results.');
+            context = `No relevant context found in ${sourceType === 'user' ? 'user' : 'system'} documents for the query "${originalQuery}".`; 
         }
 
-        // === ADD LOGGING FOR RETRIEVED CONTEXT ===
-        console.log(`[Chat RAG Debug] Found ${sources.length} context sources.`);
-        console.log('[Chat RAG Debug] Context string start:', context.substring(0, 200) + (context.length > 200 ? '...' : '')); 
-
-        // 4. Format the prompt for OpenAI (Using existing SYSTEM_PROMPT_TEMPLATE)
+        // 5. Format prompt for OpenAI (use the re-assembled context)
         const systemPrompt = SYSTEM_PROMPT_TEMPLATE.replace('${context}', context);
 
-        // 5. Build conversation history
+        // 6. Build conversation history (unchanged)
         const messages: OpenAIChatCompletionMessageParam[] = [
             { role: 'system', content: systemPrompt },
             ...history
-                .filter((msg: any) => msg.role && msg.content) // Basic validation
-                .map((msg: any) => ({ role: msg.role, content: msg.content })), // Ensure correct format
-            { role: 'user', content: query }
+                .filter((msg: any) => msg.role && msg.content) 
+                .map((msg: any) => ({ role: msg.role, content: msg.content })), 
+            { role: 'user', content: query } // Still use original query for user message
         ];
      
         console.log('[Chat] Preparing to call OpenAI with history length:', history.length);
 
-        // --- RAG DEBUG LOGGING --- 
-        console.log(`\n--- START RAG DEBUG LOG ---`);
-        console.log(`[RAG DEBUG] User Query: ${query}`);
-        console.log(`[RAG DEBUG] Retrieved Source Metadata: ${JSON.stringify(sources, null, 2)}`);
+        // --- RAG DEBUG LOGGING (Updated to show hybrid info) --- 
+        console.log(`\n--- START RAG DEBUG LOG (Hybrid) ---`);
+        console.log(`[RAG DEBUG] User Query (Original): ${originalQuery}`);
+        console.log(`[RAG DEBUG] User Query (Used for Embedding/Keyword): ${queryForEmbedding}`);
+        console.log(`[RAG DEBUG] Keyword Matched Doc IDs: ${JSON.stringify(keywordDocIds)}`);
+        console.log(`[RAG DEBUG] Final Ranked Sources Sent for Context: ${JSON.stringify(finalSourcesForLlm.map(s => ({ fn: s.fileName, docId: s.documentId, score: s.boostedScore, kw: s.isKeywordMatch })), null, 2)}`);
         console.log(`[RAG DEBUG] Context Text Sent to LLM:\n---\n${context}\n---`);
-        // console.log(`[RAG DEBUG] Full System Prompt Sent to LLM:\n---\n${systemPrompt}\n---`); // Optional: Uncomment to log the full system prompt
-        console.log(`--- END RAG DEBUG LOG ---\n`);
+        console.log(`--- END RAG DEBUG LOG (Hybrid) ---\n`);
         // --- END RAG DEBUG LOGGING ---
 
-        // 6. Call OpenAI API
+        // 7. Call OpenAI API (unchanged)
         console.time('OpenAICallDuration');
         const completion = await getChatCompletion(messages);
         console.timeEnd('OpenAICallDuration');
@@ -160,35 +220,20 @@ router.post('/', async (req: Request, res: Response): Promise<void | Response> =
         const answer = completion.choices[0].message.content.trim();
         console.log('[Chat] Received response from OpenAI.');
 
-        // 7. Prepare response with DE-DUPLICATED sources
-        const uniqueSourcesMap = new Map<string, { fileName: string; type: 'user' | 'system', documentId: string | null; }>();
-        sources.forEach(source => {
-            const key = source.documentId || source.fileName; // Use docId for user, filename for system as unique key
-            if (!uniqueSourcesMap.has(key)) {
-                uniqueSourcesMap.set(key, {
-                    fileName: source.fileName, // Use originalFileName for display
-                    type: source.type,
-                    documentId: source.documentId // Keep documentId (might be null for system)
-                });
-            }
-            // Note: Page number aggregation removed as Pinecone metadata doesn't easily support it per chunk
-        });
-        const finalSources = Array.from(uniqueSourcesMap.values());
-
-        // --- Update Response Object structure to match IChatMessage/Frontend expectation (if needed) ---
-        // Ensure the structure matches what IChatMessage expects for sources
-        // Example: Assuming IChatMessage source needs { source: string, ... }
-        const finalSourcesForResponse = finalSources.map(fs => ({
+        // 8. Prepare response with DE-DUPLICATED sources from final Llm list
+        // Use finalSourcesForLlm directly as it's already deduplicated by documentId
+        const finalSourcesForResponse = finalSourcesForLlm.map(fs => ({
           documentId: fs.documentId,
           type: fs.type,
           fileName: fs.fileName, // Ensure this field name is consistent
-          // Add pageNumbers if available/needed - Currently not available from this point
+          score: fs.boostedScore, // Include score for potential UI display
+          keywordMatch: fs.isKeywordMatch // Include flag
         }));
 
         const responseObject: any = {
             success: true,
             answer,
-            sources: finalSourcesForResponse.slice(0, 5) // Limit unique sources, use adjusted structure
+            sources: finalSourcesForResponse // Use the ranked & deduplicated sources
         };
         console.log('[Chat] Sending final response. Answer length:', answer.length, 'Sources count:', responseObject.sources.length);
 
@@ -209,7 +254,12 @@ router.post('/', async (req: Request, res: Response): Promise<void | Response> =
             const assistantMessage: IChatMessage = {
                 role: 'assistant',
                 content: responseObject.answer,
-                sources: finalSourcesForResponse,
+                sources: finalSourcesForResponse.map(s => ({ // Map to expected IChatMessage source format
+                    documentId: s.documentId,
+                    fileName: s.fileName,
+                    type: s.type
+                    // Add score/keywordMatch here if IChatMessage schema supports it
+                 })),
                 timestamp: new Date()
             };
 
