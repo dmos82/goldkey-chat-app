@@ -402,6 +402,46 @@ export default function Home() {
     }
   };
 
+  // --- Handler for Deleting ALL CHATS ---
+  const handleConfirmDeleteAllChats = async () => {
+    console.log(`[Delete All Chats] Attempting to delete all chats for user`);
+    if (!token) {
+      toast({ variant: "destructive", title: "Error", description: "Authentication token not found." });
+      return;
+    }
+    setIsDeletingAll(true); // Reuse deleting state or create a new one? Reusing for now.
+
+    try {
+      // Use the dedicated endpoint for deleting all chats
+      const response = await fetch(`${API_BASE_URL}/api/chat/all`, { // <-- Endpoint for deleting all chats
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+
+      const result = await response.json(); // Try to parse JSON regardless of status
+
+      if (!response.ok) {
+        // Use message from backend if available, otherwise use status text
+        const errorMsg = result?.message || response.statusText || `Failed to delete all chats (${response.status})`;
+        throw new Error(errorMsg);
+      }
+
+      console.log(`[Delete All Chats] Successfully deleted ${result.deletedCount || 0} chats.`);
+      toast({ title: "Success", description: result.message || "All chats deleted successfully." });
+
+      // Update frontend state
+      setChats([]); // Clear the chat list
+      setSelectedChatId(null); // Unselect any active chat
+      setCurrentMessages([]); // Clear messages
+
+    } catch (error: any) {
+      console.error("[Delete All Chats] Error deleting chats:", error);
+      toast({ variant: "destructive", title: "Error Deleting Chats", description: error.message });
+    } finally {
+        setIsDeletingAll(false); // Reset loading state
+    }
+  };
+
   // --- Handler for Deleting ALL User Documents ---
   const handleDeleteAllDocuments = async () => {
     if (!token) {
@@ -439,7 +479,6 @@ export default function Home() {
       setIsDeletingAll(false);
     }
   };
-  // --- End Delete All Handler ---
 
   // Clean up Blob URL on unmount (consider moving to modal if more robust handling needed)
   useEffect(() => {
@@ -466,7 +505,8 @@ export default function Home() {
         isLoadingChats={isLoadingChats}
         handleNewChat={handleNewChat}
         handleSelectChat={handleSelectChat}
-        handleConfirmDelete={handleConfirmDelete} // Pass down the delete handler
+        handleConfirmDelete={handleConfirmDelete}
+        handleConfirmDeleteAll={handleConfirmDeleteAllChats}
       >
         {/* --- Main Content Area (Passed as children to MainLayout) --- */}
         <div id="content-switcher" className="p-4 h-full"> {/* Use h-full if chat needs it */}
