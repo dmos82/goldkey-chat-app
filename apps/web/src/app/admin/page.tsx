@@ -60,6 +60,18 @@ interface AdminUser {
   // Add other non-sensitive fields as needed
 }
 
+// NEW: Define Usage Data Type
+interface AdminUsageData {
+  _id: string; // User ID
+  username: string;
+  role: string;
+  usageMonthMarker?: string | null;
+  currentMonthPromptTokens?: number;
+  currentMonthCompletionTokens?: number;
+  currentMonthCost?: number;
+  totalTokens?: number; // Added in API response
+}
+
 // Helper function to format bytes
 function formatBytes(bytes: number, decimals = 2): string {
   if (bytes === 0) return '0 Bytes';
@@ -103,6 +115,11 @@ export default function AdminPage() {
 
   // --- State for Deleting All System Documents ---
   const [isDeletingAllSystemDocs, setIsDeletingAllSystemDocs] = useState(false);
+
+  // --- NEW: State for User Usage Tab ---
+  const [userUsageData, setUserUsageData] = useState<AdminUsageData[]>([]);
+  const [isUsageLoading, setIsUsageLoading] = useState<boolean>(false);
+  const [usageError, setUsageError] = useState<string | null>(null);
 
   // --- Document Fetching Logic (Refactored to standalone function) --- 
   const fetchDocuments = useCallback(async () => {
@@ -217,12 +234,51 @@ export default function AdminPage() {
     }
   }, [token, user, isAuthenticated, toast]);
 
+  // --- NEW: Usage Fetching Logic ---
+  const fetchUserUsage = useCallback(async () => {
+    if (!isAuthenticated || user?.role !== 'admin' || !token) {
+      console.log('Skipping usage fetch: User not admin or token missing.');
+      setUserUsageData([]);
+      return;
+    }
+    console.log('Fetching user usage data...');
+    setIsUsageLoading(true);
+    setUsageError(null);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/admin/usage`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'Failed to parse error response.' }));
+        if (response.status === 403) {
+            throw new Error(errorData.message || 'Forbidden: Admin access required.');
+        }
+        throw new Error(errorData.message || `HTTP error ${response.status}`);
+      }
+      const responseData = await response.json();
+      if (responseData.success && Array.isArray(responseData.usersUsage)) {
+        setUserUsageData(responseData.usersUsage);
+      } else {
+        throw new Error(responseData.message || 'Invalid user usage data structure received.');
+      }
+    } catch (error: any) {
+      console.error('Failed to fetch user usage data:', error);
+      toast({ title: 'Error Fetching Usage Data', description: error.message, variant: 'destructive' });
+      setUsageError(error.message);
+      setUserUsageData([]);
+    } finally {
+      setIsUsageLoading(false);
+    }
+  }, [token, user, isAuthenticated, toast]);
+
   // --- Trigger data fetch based on active tab ---
   const handleTabChange = (value: string) => {
     if (value === 'users' && users.length === 0) { // Fetch users only if tab is selected and not already loaded
       fetchUsers();
     } else if (value === 'documents' && documents.length === 0) {
       fetchDocuments(); // Fetch documents if selected and not loaded (already handled by initial useEffect)
+    } else if (value === 'usage' && userUsageData.length === 0) { // Fetch usage data
+        fetchUserUsage();
     }
     // Add logic for other tabs if needed
   };
@@ -598,6 +654,7 @@ export default function AdminPage() {
           <TabsTrigger value="documents">Documents</TabsTrigger>
           <TabsTrigger value="users">Users</TabsTrigger>
           <TabsTrigger value="system">System</TabsTrigger>
+          <TabsTrigger value="usage">Usage Statistics</TabsTrigger>
         </TabsList>
         
         <TabsContent value="overview">
@@ -831,6 +888,54 @@ Permanently remove all documents, metadata, and vector embeddings from the share
         
         <TabsContent value="system">
           <p>System Settings placeholder.</p>
+        </TabsContent>
+
+        <TabsContent value="usage">
+            <div className="bg-card p-6 rounded-lg shadow">
+                <h2 className="text-xl font-semibold mb-4">Monthly Usage Statistics</h2>
+                {isUsageLoading ? (
+                    <div className="space-y-2">
+                        <Skeleton className="h-8 w-full" />
+                        <Skeleton className="h-8 w-full" />
+                        <Skeleton className="h-8 w-full" />
+                    </div>
+                ) : usageError ? (
+                    <p className="text-destructive">Error loading usage data: {usageError}</p>
+                ) : (
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Username</TableHead>
+                                <TableHead>Role</TableHead>
+                                <TableHead>Month</TableHead>
+                                <TableHead className="text-right">Prompt Tokens</TableHead>
+                                <TableHead className="text-right">Completion Tokens</TableHead>
+                                <TableHead className="text-right">Total Tokens</TableHead>
+                                <TableHead className="text-right">Est. Cost (USD)</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {userUsageData.length === 0 ? (
+                                <TableRow>
+                                    <TableCell colSpan={7} className="text-center text-muted-foreground">No usage data available.</TableCell>
+                                </TableRow>
+                            ) : (
+                                userUsageData.map((usage) => (
+                                    <TableRow key={usage._id}>
+                                        <TableCell className="font-medium">{usage.username}</TableCell>
+                                        <TableCell>{usage.role}</TableCell>
+                                        <TableCell>{usage.usageMonthMarker || '-'}</TableCell>
+                                        <TableCell className="text-right">{(usage.currentMonthPromptTokens || 0).toLocaleString()}</TableCell>
+                                        <TableCell className="text-right">{(usage.currentMonthCompletionTokens || 0).toLocaleString()}</TableCell>
+                                        <TableCell className="text-right font-semibold">{(usage.totalTokens || 0).toLocaleString()}</TableCell>
+                                        <TableCell className="text-right">${(usage.currentMonthCost || 0).toFixed(6)}</TableCell>
+                                    </TableRow>
+                                ))
+                            )}
+                        </TableBody>
+                    </Table>
+                )}
+            </div>
         </TabsContent>
       </Tabs>
 
