@@ -144,79 +144,91 @@ export default function ChatInterface({
   return (
     <div className="flex flex-col h-full bg-background-light dark:bg-background-dark text-text-primary-light dark:text-text-primary-dark">
       <div className="flex-grow overflow-y-auto p-4 space-y-6">
-        {messages.map((msg, index) => (
-          <div 
-            key={msg._id || index} 
-            className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
-          >
-            <div 
-              className={`relative max-w-[85%] md:max-w-[75%] p-3.5 shadow-md rounded-2xl ${
-                msg.sender === 'user'
-                  ? 'bg-blue-100 dark:bg-blue-800 rounded-br-sm'
-                  : 'bg-gray-100 dark:bg-gray-700 rounded-tl-sm'
-              }`}
-            >
-              <div className="w-full h-full">
-                {msg.sender === 'user' ? (
-                  <p className="text-sm whitespace-pre-wrap text-black dark:text-white">
-                    {msg.text}
-                  </p>
-                ) : (
-                  <p className="text-sm whitespace-pre-wrap text-black dark:text-white">{msg.text}</p>
-                )}
+        {messages.map((msg: Message, index: number) => {
+            // *** TEMPORARY DEBUG LOG ***
+            if (msg.sender === 'assistant') {
+              console.log(`[ChatInterface Render Debug] Assistant Message ${index}:`, { 
+                  text: msg.text.substring(0, 30) + '...', 
+                  usage: msg.usage, 
+                  cost: msg.cost 
+              });
+            }
+            // *** END DEBUG LOG ***
+            
+            return (
+              <div 
+                key={msg._id || index} 
+                className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+              >
+                <div 
+                  className={`relative max-w-[85%] md:max-w-[75%] p-3.5 shadow-md rounded-2xl ${
+                    msg.sender === 'user'
+                      ? 'bg-blue-100 dark:bg-blue-800 rounded-br-sm'
+                      : 'bg-gray-100 dark:bg-gray-700 rounded-tl-sm'
+                  }`}
+                >
+                  <div className="w-full h-full">
+                    {msg.sender === 'user' ? (
+                      <p className="text-sm whitespace-pre-wrap text-black dark:text-white">
+                        {msg.text}
+                      </p>
+                    ) : (
+                      <p className="text-sm whitespace-pre-wrap text-black dark:text-white">{msg.text}</p>
+                    )}
 
-                {/* --- START: Display Usage/Cost for Assistant Messages --- */}
-                {msg.sender === 'assistant' && msg.usage && msg.cost !== null && msg.cost !== undefined && (
-                  <TooltipProvider delayDuration={300}>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <div className="mt-2 pt-1 border-t border-gray-300 dark:border-gray-600">
-                          <p className="text-xs text-gray-500 dark:text-gray-400">
-                            Usage: {msg.usage.total_tokens} tokens | Cost: ${msg.cost.toFixed(6)}
-                          </p>
-                        </div>
-                      </TooltipTrigger>
-                      <TooltipContent side="bottom" className="text-xs bg-background dark:bg-accent text-foreground dark:text-accent-foreground border border-border rounded-md shadow-lg p-2">
-                        <p>Prompt Tokens: {msg.usage.prompt_tokens}</p>
-                        <p>Completion Tokens: {msg.usage.completion_tokens}</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                )}
-                {/* --- END: Display Usage/Cost --- */}
+                    {/* --- START: Display Usage/Cost for Assistant Messages --- */}
+                    {msg.sender === 'assistant' && msg.usage && msg.cost !== null && msg.cost !== undefined && (
+                      <TooltipProvider delayDuration={300}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="mt-2 pt-1 border-t border-gray-300 dark:border-gray-600">
+                              <p className="text-xs text-gray-500 dark:text-gray-400">
+                                Usage: {msg.usage.total_tokens} tokens | Cost: ${msg.cost.toFixed(6)}
+                              </p>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom" className="text-xs bg-background dark:bg-accent text-foreground dark:text-accent-foreground border border-border rounded-md shadow-lg p-2">
+                            <p>Prompt Tokens: {msg.usage.prompt_tokens}</p>
+                            <p>Completion Tokens: {msg.usage.completion_tokens}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    )}
+                    {/* --- END: Display Usage/Cost --- */}
 
-                {msg.sources && msg.sources.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-2 items-center text-xs">
-                    <span className="font-semibold mr-1">Sources:</span>
-                    {msg.sources.map((source, idx) => {
-                      return (
-                        <Button
-                          key={`source-${msg._id}-${idx}`}
-                          variant="outline"
-                          size="sm"
-                          className="h-auto px-2 py-1 text-xs border-primary/50 hover:bg-primary/10"
-                          onClick={() => {
-                            onSourceClick?.(source);
-                          }}
-                          disabled={!source.documentId}
-                        >
-                          <FileText className="w-3 h-3 mr-1" />
-                          {source.source || 'Unknown File'} {source.pageNumbers?.length ? `(p. ${source.pageNumbers.join(', ')})` : ''}
-                        </Button>
-                      );
-                    })}
+                    {msg.sources && msg.sources.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-2 items-center text-xs">
+                        <span className="font-semibold mr-1">Sources:</span>
+                        {msg.sources.map((source: Source, idx: number) => {
+                          return (
+                            <Button
+                              key={`source-${msg._id}-${idx}`}
+                              variant="outline"
+                              size="sm"
+                              className="h-auto px-2 py-1 text-xs border-primary/50 hover:bg-primary/10"
+                              onClick={() => {
+                                onSourceClick?.(source);
+                              }}
+                              disabled={!source.documentId}
+                            >
+                              <FileText className="w-3 h-3 mr-1" />
+                              {source.source || 'Unknown File'} {source.pageNumbers?.length ? `(p. ${source.pageNumbers.join(', ')})` : ''}
+                            </Button>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
-                )}
+                  {msg.sender === 'user' && (
+                    <div className="absolute w-0 h-0 bottom-[6px] right-[-8px] border-8 border-transparent border-l-primary-light dark:border-l-primary-dark"></div>
+                  )}
+                  {msg.sender === 'assistant' && (
+                    <div className="absolute w-0 h-0 top-[6px] left-[-8px] border-8 border-transparent border-r-gray-100 dark:border-r-gray-700"></div>
+                  )}
+                </div>
               </div>
-              {msg.sender === 'user' && (
-                <div className="absolute w-0 h-0 bottom-[6px] right-[-8px] border-8 border-transparent border-l-primary-light dark:border-l-primary-dark"></div>
-              )}
-              {msg.sender === 'assistant' && (
-                <div className="absolute w-0 h-0 top-[6px] left-[-8px] border-8 border-transparent border-r-gray-100 dark:border-r-gray-700"></div>
-              )}
-            </div>
-          </div>
-        ))}
+            );
+        })}
         {isLoadingMessages && (
           <div className="flex justify-start">
             <div className="relative p-3 rounded-2xl rounded-tl-sm bg-gray-100 dark:bg-gray-700 text-text-secondary-light dark:text-text-secondary-dark italic text-sm shadow-md">
