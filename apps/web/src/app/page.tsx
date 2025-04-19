@@ -192,16 +192,39 @@ export default function Home() {
             // Combine the definitive list from the API with the optimistic ones not yet confirmed
             let combined = [...newMessagesFromApi, ...optimisticMessagesToKeep];
 
-            // Optional: Deduplicate if needed (e.g., if optimistic msg got ID late)
-            // combined = Array.from(new Map(combined.map(msg => [msg._id || msg.timestamp, msg])).values());
+            // --- ADDED Deduplication Logic ---
+            const uniqueMessages = combined.reduce((acc, current) => {
+                // Find index of potential duplicate in accumulator
+                const existingIndex = acc.findIndex(msg =>
+                    // Match by ID primarily if both messages have one
+                    (msg._id && current._id && msg._id === current._id) ||
+                    // Fallback for optimistic: match by timestamp & sender if IDs are missing
+                    // (Adjust this heuristic if timestamps aren't precise enough)
+                    (!msg._id && !current._id && msg.timestamp === current.timestamp && msg.sender === current.sender)
+                );
 
-            // Sort by timestamp to maintain order
-            combined.sort((a, b) => 
+                if (existingIndex > -1) {
+                    // Duplicate found. Prioritize keeping the version with 'usage' data.
+                    // If 'current' has usage and the one already in 'acc' doesn't, replace it.
+                    if (current.usage && !acc[existingIndex].usage) {
+                        acc[existingIndex] = current;
+                    }
+                    // Otherwise, keep the one already in 'acc' (it might already have usage, or neither has it).
+                } else {
+                    // No duplicate found based on criteria, add 'current' to accumulator.
+                    acc.push(current);
+                }
+                return acc;
+            }, [] as Message[]); // Initialize accumulator as Message array
+            // --- END Deduplication Logic ---
+
+            // Sort the unique messages by timestamp
+            uniqueMessages.sort((a, b) => 
                 new Date(a.timestamp || 0).getTime() - new Date(b.timestamp || 0).getTime()
             );
 
-            console.log(`[loadMessages Refined] Merged ${newMessagesFromApi.length} fetched with ${optimisticMessagesToKeep.length} optimistic. Total: ${combined.length}`);
-            return combined;
+            console.log(`[loadMessages Dedupe] Merged ${newMessagesFromApi.length} + ${optimisticMessagesToKeep.length} -> Deduped ${uniqueMessages.length}`);
+            return uniqueMessages; // Return the deduplicated and sorted array
         });
         console.log('[Effect loadMessages] State update queued with refined merged messages.');
 
