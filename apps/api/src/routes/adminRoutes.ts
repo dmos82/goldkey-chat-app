@@ -153,7 +153,7 @@ router.post('/system-kb/upload', upload.single('file'), async (req: Request, res
         if (textChunks.length === 0) throw new Error("File chunking resulted in zero chunks.");
 
         // 3. Save document metadata to MongoDB (SourceType: system)
-        const docDataToSave = {
+        const newDocument = new UserDocument({
             // No userId for system documents
             fileName: savedFileName, // Store unique name
             originalFileName: originalFileName,
@@ -162,29 +162,12 @@ router.post('/system-kb/upload', upload.single('file'), async (req: Request, res
             mimeType: file.mimetype,
             sourceType: 'system', // Mark as system document
             status: 'processing'
-        };
-        console.log('[Upload Debug] Document data prepared for MongoDB save:', JSON.stringify(docDataToSave)); // Log data before creating model instance
-
-        const newDocument = new UserDocument(docDataToSave);
-        
-        let savedDoc: IUserDocument | null = null;
-        try {
-            console.log('[Upload Debug] Attempting to save document to MongoDB...');
-            savedDoc = await newDocument.save();
-            console.log('[Upload Debug] Successfully saved document to MongoDB. Raw result:', savedDoc); // Log the full saved document object
-        } catch (dbError: any) {
-            console.error('[Upload Debug] !!! FAILED to save document to MongoDB !!! Error:', dbError);
-            // Re-throw the error to be caught by the outer try-catch block for consistent error handling
-            throw new Error(`Failed to save document metadata to MongoDB: ${dbError.message}`);
-        }
-
-        // Ensure _id exists after the save attempt
-        if (!savedDoc?._id) {
-            console.error('[Upload Debug] MongoDB save completed but document or _id is missing.', savedDoc); // Log if _id is missing after presumed success
-            throw new Error("Failed to retrieve document ID after saving metadata to MongoDB.");
-        }
-        documentId = (savedDoc._id as mongoose.Types.ObjectId).toString();
-        console.log(`[Admin Upload] Retrieved document ID from saved record: ${documentId}`);
+        });
+        await newDocument.save();
+        // Ensure _id exists before proceeding
+        if (!newDocument?._id) throw new Error("Failed to save System KB document metadata or retrieve ID.");
+        documentId = (newDocument._id as mongoose.Types.ObjectId).toString();
+        console.log(`[Admin Upload] Saved System KB doc metadata to DB. ID: ${documentId}`);
 
         // === START: Move file from temp to persistent storage ===
         const finalFilePath = path.join(KNOWLEDGE_BASE_DIR, savedFileName); // Use correct dir + unique name
@@ -403,17 +386,28 @@ router.post('/system-kb/reindex/:documentId', isAdmin, async (req: Request, res:
 
 
         // 5. Prepare New Vectors for Pinecone
-        const vectors: PineconeVector[] = chunks.map((chunk, index) => ({
-            id: `${documentId}_chunk_${index}`, // Maintain consistent ID format
-            values: embeddings[index],
-            metadata: {
-                documentId: documentId,
-                originalFileName: document!.originalFileName, // Use ! because we checked non-null earlier
-                chunkIndex: index,
-                text: chunk.text,
-                sourceType: 'system'
-            }
-        }));
+        const vectors: PineconeVector[] = chunks.map((chunk, index) => {
+            // --- START: Chunk Text Logging ---
+            const chunkText = chunk.text;
+            const chunkIndex = index;
+            console.log(`\n[Reindex Chunk Debug] DocID: ${documentId}, Chunk ${chunkIndex}:`);
+            console.log(`--- START CHUNK TEXT (Size: ${chunkText.length}) ---`);
+            console.log(chunkText);
+            console.log(`--- END CHUNK TEXT ---\n`);
+            // --- END: Chunk Text Logging ---
+
+            return {
+                id: `${documentId}_chunk_${chunkIndex}`, // Maintain consistent ID format
+                values: embeddings[index],
+                metadata: {
+                    documentId: documentId,
+                    originalFileName: document!.originalFileName, // Use ! because we checked non-null earlier
+                    chunkIndex: chunkIndex, // Use the defined index variable
+                    text: chunkText, // Use the defined text variable
+                    sourceType: 'system'
+                }
+            };
+        });
         console.log(`[Admin Reindex] Prepared ${vectors.length} vectors for upsert.`);
 
 
