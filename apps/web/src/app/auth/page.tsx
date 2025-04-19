@@ -32,13 +32,20 @@ export default function AuthPage() {
       <div className="w-full max-w-4xl text-center flex flex-col items-center"> 
         {/* Logo */}
         <div className="mb-6">
-          <Image 
-            src="/gk_logo_new.png" 
-            alt="Gold Key Insurance Logo" 
-            width={180}
-            height={50} 
-            priority
-          />
+          <a 
+            href="https://www.goldkeyinsurance.ca/" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            aria-label="Gold Key Insurance Homepage"
+          >
+            <Image 
+              src="/gk_logo_new.png" 
+              alt="Gold Key Insurance Logo" 
+              width={180}
+              height={50} 
+              priority
+            />
+          </a>
         </div>
 
         <h1 className="text-4xl font-bold mb-10 text-foreground"> 
