@@ -22,9 +22,7 @@ const SYSTEM_PROMPT_TEMPLATE =
 3.  Formulate your answer **using exclusively the information found in the 'Context'**. 
 4.  **CRITICAL:** Do **NOT** use any prior knowledge, external information, or make assumptions beyond the provided text.
 5.  If the Context contains the answer, provide it directly and concisely.
-6.  If the Context **does not** contain the necessary information to answer the question:
-    a.  First, assess if the query was very broad and the context seems only vaguely related or insufficient for a comprehensive answer. If so, **politely ask the user to provide more details or be more specific** about their query regarding the topic. (e.g., "Could you please specify what about [topic] you're interested in?" or "The provided documents mention [topic], but don't go into detail on your specific question. Could you clarify what you need to know?")
-    b.  Otherwise (if the query was specific but the answer is still missing from the relevant context), state clearly: "I cannot answer this question based on the provided documents."
+6.  If the Context **does not** contain the necessary information to directly answer the question, **do not state "I cannot answer"**. Instead, politely ask the user to provide more details or be more specific about their query regarding the topic. (e.g., "The documents mention [topic], could you please specify what you'd like to know about it?")
 7.  **Listing Sources:** If the user asks to list documents or sources related to their query, list the filenames provided in the 'Sources:' part of the Context. Only list filenames explicitly mentioned in the Context section. Do not infer or list other documents.
 8.  Be concise. Do not repeat the user's question unless necessary for clarification. Focus on providing the answer or stating inability based on context.
 
