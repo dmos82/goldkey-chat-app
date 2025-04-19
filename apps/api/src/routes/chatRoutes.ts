@@ -6,6 +6,7 @@ import { ChatCompletionMessageParam as OpenAIChatCompletionMessageParam } from '
 import { Chat, IChatMessage, IChat } from '../models/ChatModel';
 import { queryVectors } from '../utils/pineconeService';
 import { UserDocument } from '../models/UserDocument'; // Import UserDocument model
+import User from '../models/UserModel'; // Corrected Import: Use the default export
 
 const router: Router = express.Router();
 
@@ -248,11 +249,64 @@ router.post('/', async (req: Request, res: Response): Promise<void | Response> =
             const completionTokens = completion.usage.completion_tokens || 0;
 
             // Calculate cost using specified GPT-4.1 Mini prices
-            requestCost = (promptTokens * GPT41_MINI_PRICE_PER_PROMPT_TOKEN) + (completionTokens * GPT41_MINI_PRICE_PER_COMPLETION_TOKEN);
+            requestCost = (promptTokens * GPT41_MINI_PRICE_PER_PROMPT_TOKEN) + 
+                          (completionTokens * GPT41_MINI_PRICE_PER_COMPLETION_TOKEN);
 
-            console.log(`[Chat Cost Calc - Route] Tokens: P${promptTokens}/C${completionTokens}. Model: ${completion.model}. Cost: $${requestCost.toFixed(6)}`);
+            console.log(`[Chat] OpenAI usage: Prompt Tokens: ${promptTokens}, Completion Tokens: ${completionTokens}, Total Tokens: ${usageData.total_tokens}, Calculated Cost: $${requestCost.toFixed(8)}`);
+
+            // --- BEGIN USAGE TRACKING UPDATE --- 
+            if (userId && promptTokens >= 0 && completionTokens >= 0) { // Only track if we have user and valid usage
+                try {
+                    const now = new Date();
+                    const currentMonthMarker = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`; // Format: YYYY-MM
+
+                    // Fetch user with specific fields needed for usage update
+                    const user = await User.findById(userId).select('+usageMonthMarker +currentMonthPromptTokens +currentMonthCompletionTokens +currentMonthCost');
+                    
+                    if (user) {
+                        let updateOperation = {};
+                        
+                        if (user.usageMonthMarker === currentMonthMarker) {
+                            // Increment existing month's usage
+                            updateOperation = {
+                                $inc: {
+                                    currentMonthPromptTokens: promptTokens,
+                                    currentMonthCompletionTokens: completionTokens,
+                                    currentMonthCost: requestCost,
+                                }
+                            };
+                            console.log(`[Usage Tracking] Incrementing usage for user ${userId}, month ${currentMonthMarker}`);
+                        } else {
+                            // Reset usage for the new month
+                            updateOperation = {
+                                $set: {
+                                    usageMonthMarker: currentMonthMarker,
+                                    currentMonthPromptTokens: promptTokens,
+                                    currentMonthCompletionTokens: completionTokens,
+                                    currentMonthCost: requestCost,
+                                }
+                            };
+                            console.log(`[Usage Tracking] Resetting usage for user ${userId}, new month ${currentMonthMarker}`);
+                        }
+                        
+                        await User.findByIdAndUpdate(userId, updateOperation);
+                        console.log(`[Usage Tracking] Successfully updated usage stats for user ${userId}`);
+
+                    } else {
+                        console.error(`[Usage Tracking] Could not find user ${userId} to update usage stats.`);
+                    }
+                } catch (usageUpdateError: any) {
+                    console.error(`[Usage Tracking] Failed to update usage stats for user ${userId}:`, usageUpdateError);
+                    // Non-fatal: Do not prevent chat response from being sent
+                }
+            } else {
+                if (!userId) console.warn('[Usage Tracking] Cannot update usage stats: userId is missing.');
+                if (!(promptTokens >= 0 && completionTokens >= 0)) console.warn('[Usage Tracking] Cannot update usage stats: Invalid token counts.', {promptTokens, completionTokens});
+            }
+            // --- END USAGE TRACKING UPDATE ---
+
         } else {
-            console.warn('[Chat Cost Calc - Route] Token usage data not found in OpenAI completion object.');
+            console.warn('[Chat] OpenAI completion response did not contain usage data.');
         }
         // --- End Token Usage & Cost Calculation ---
 

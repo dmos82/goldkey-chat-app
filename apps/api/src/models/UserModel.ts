@@ -7,6 +7,12 @@ export interface IUser extends Document {
   createdAt: Date;
   role: string;
   activeSessionId?: string; // Added: Tracks the active session ID
+  // --- Added for Usage Tracking ---
+  usageMonthMarker?: string; // Format: YYYY-MM
+  currentMonthPromptTokens?: number;
+  currentMonthCompletionTokens?: number;
+  currentMonthCost?: number; // Store cost in USD
+  // --------------------------------
 }
 
 // Define the Mongoose schema
@@ -38,6 +44,24 @@ const UserSchema: Schema = new Schema({
     default: null,
     index: true, // Might be useful for quickly finding users by session ID, though unlikely
   },
+  // --- Added for Usage Tracking ---
+  usageMonthMarker: { 
+    type: String, 
+    required: false 
+  },
+  currentMonthPromptTokens: { 
+    type: Number, 
+    default: 0 
+  },
+  currentMonthCompletionTokens: { 
+    type: Number, 
+    default: 0 
+  },
+  currentMonthCost: { 
+    type: Number, 
+    default: 0 
+  },
+  // --------------------------------
 }, { timestamps: true });
 
 // Create and export the User model
