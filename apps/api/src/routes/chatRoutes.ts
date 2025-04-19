@@ -277,13 +277,24 @@ router.post('/', async (req: Request, res: Response): Promise<void | Response> =
                 chat.updatedAt = new Date();
             } else {
                 console.log(`[Chat Persistence] No existing chat found or ID invalid/missing. Creating new chat for user ${userId}`);
-                const chatTitle = query.substring(0, 40) + (query.length > 40 ? '...' : '');
+                
+                // --- Generate Chat Title --- 
+                const MAX_TITLE_LENGTH = 40;
+                let generatedChatName = originalQuery.substring(0, MAX_TITLE_LENGTH);
+                if (originalQuery.length > MAX_TITLE_LENGTH) {
+                    generatedChatName += "...";
+                }
+                if (!generatedChatName.trim()) { // Handle empty/whitespace query
+                    generatedChatName = "Chat Session"; // More descriptive than just "Chat"
+                }
+                // --------------------------
+
                 chat = new Chat({
                     userId: new mongoose.Types.ObjectId(userId.toString()),
-                    title: chatTitle,
+                    chatName: generatedChatName.trim(), // Use generated title
                     messages: [userMessage, assistantMessage]
                 });
-                console.log(`[Chat Persistence] New chat object created with ID ${chat._id}`);
+                console.log(`[Chat Persistence] New chat object created with ID ${chat._id} and Title: "${generatedChatName.trim()}"`);
             }
 
             await chat.save();
