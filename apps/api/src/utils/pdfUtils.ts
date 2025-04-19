@@ -9,8 +9,8 @@ try {
     console.log(`[pdfUtils] Set pdfjs workerSrc to: ${workerSrcPath}`);
 } catch (error) {
     console.error("[pdfUtils] Failed to resolve pdf.worker.js path. PDF processing might fail.", error);
-    // Consider making this fatal if PDF processing is essential
-    // throw new Error("Failed to configure PDF worker.");
+    // Throw an error here to prevent the server starting with broken PDF processing
+    throw new Error("Failed to configure PDF worker. Cannot start server.");
 }
 // -------------------------
 
