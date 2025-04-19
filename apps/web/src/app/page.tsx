@@ -506,7 +506,7 @@ export default function Home() {
         handleNewChat={handleNewChat}
         handleSelectChat={handleSelectChat}
         handleConfirmDelete={handleConfirmDelete}
-        handleConfirmDeleteAll={handleConfirmDeleteAllChats}
+        onDeleteAllChats={handleConfirmDeleteAllChats}
       >
         {/* --- Main Content Area (Passed as children to MainLayout) --- */}
         <div id="content-switcher" className="p-4 h-full"> {/* Use h-full if chat needs it */}

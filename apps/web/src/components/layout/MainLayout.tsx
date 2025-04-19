@@ -37,6 +37,12 @@ import {
 } from "@/components/ui/alert-dialog"; // Import AlertDialog components
 import { cn } from "@/lib/utils"; // Import cn for conditional class names
 import { API_BASE_URL } from '@/lib/config';
+import { 
+    Tooltip, 
+    TooltipContent, 
+    TooltipProvider, 
+    TooltipTrigger 
+} from "@/components/ui/tooltip"; // Import Tooltip components
 
 // Re-define Document type locally if not imported, or ensure import is correct
 interface Document {
@@ -61,6 +67,7 @@ interface MainLayoutProps {
   handleNewChat: () => void;
   handleSelectChat: (chatId: string) => void;
   handleConfirmDelete: (chatId: string) => void; // Add delete handler prop
+  onDeleteAllChats: () => void; // <<< RENAME THIS PROP
 }
 
 export const MainLayout: React.FC<MainLayoutProps> = ({
@@ -79,6 +86,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
   handleNewChat,
   handleSelectChat,
   handleConfirmDelete, // Destructure delete handler
+  onDeleteAllChats, // <<< RENAME THIS PROP
 }) => {
   const { user } = useAuth(); // Get user for display
   const { theme, setTheme } = useTheme(); // Get theme state and setter
@@ -92,16 +100,8 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
   // --- Add state for search results if needed, or filter kbDocuments directly ---
   const [kbSearchTerm, setKbSearchTerm] = useState(''); // Renamed from kbSearchQuery
 
-  // State for Delete Confirmation Dialog
-  const [isAlertOpen, setIsAlertOpen] = useState(false);
-  const [chatToDeleteId, setChatToDeleteId] = useState<string | null>(null);
-  const [chatToDeleteName, setChatToDeleteName] = useState<string>('');
-
-  const openDeleteDialog = (chatId: string, chatName: string) => {
-    setChatToDeleteId(chatId);
-    setChatToDeleteName(chatName);
-    setIsAlertOpen(true);
-  };
+  // State for Delete ALL Confirmation Dialog
+  const [isAlertAllOpen, setIsAlertAllOpen] = useState(false);
 
   // Fetch KB docs when overlay is opened (or on mount if preferred)
   useEffect(() => {
@@ -282,7 +282,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                   )}
                   onClick={(e) => { 
                       e.stopPropagation();
-                      openDeleteDialog(chat._id, chat.chatName);
+                      handleConfirmDelete(chat._id); // Use the prop handler
                   }}
                   title={`Delete chat: ${chat.chatName}`}
                 >
@@ -293,9 +293,30 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
           )}
         </div>
 
-        {/* User Status/Logout at bottom */}
-        <div className="mt-auto pt-3 border-t border-border">
-           <UserStatus />
+        {/* Delete All Button & User Status */}
+        <div className="mt-auto pt-3 border-t border-border space-y-2">
+          {/* Add Delete All Button Here */}
+           <TooltipProvider delayDuration={100}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-center text-destructive hover:bg-destructive/10 hover:text-destructive transition-all duration-200 ease-in-out active:scale-[0.98]"
+                  onClick={() => setIsAlertAllOpen(true)} // Open the 'delete all' dialog
+                  disabled={isLoadingChats || chats.length === 0} // Disable if loading or no chats
+                >
+                  <Trash2 className="mr-1.5 h-4 w-4" />
+                  Delete All Chats
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top" align="center">
+                <p>Permanently delete all your chat history.</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
+          <UserStatus />
         </div>
       </nav>
 
@@ -413,29 +434,22 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
         </div>
       )}
 
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
+      {/* Delete ALL Confirmation Dialog */}
+      <AlertDialog open={isAlertAllOpen} onOpenChange={setIsAlertAllOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogTitle>Delete All Chat History?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the chat
-              <strong className="px-1">{chatToDeleteName}</strong>
-              and remove its data from our servers.
+              This action cannot be undone. This will permanently delete all of your chat conversations.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setChatToDeleteId(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction 
-              onClick={() => {
-                if (chatToDeleteId) {
-                   handleConfirmDelete(chatToDeleteId);
-                   setChatToDeleteId(null); // Reset after confirming
-                }
-              }}
+              onClick={onDeleteAllChats} // <<< UPDATE THIS CALL
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Delete Chat
+              Delete All
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
