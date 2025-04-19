@@ -455,4 +455,41 @@ router.delete('/chats/:chatId', async (req: Request, res: Response): Promise<voi
     }
 });
 
+// --- NEW ROUTE: DELETE /api/chat/all --- 
+router.delete('/all', async (req: Request, res: Response): Promise<void | Response> => {
+    const userId = req.user?._id;
+    const username = req.user?.username;
+
+    if (!userId) {
+        // Should be caught by protect middleware, but safety check
+        console.error('[Chat Delete All] User ID not found after protect middleware.');
+        return res.status(401).json({ success: false, message: 'Authentication error: User ID not found.' });
+    }
+
+    console.log(`[Chat Delete All] Request received for user: ${username} (ID: ${userId})`);
+
+    try {
+        const result = await Chat.deleteMany({ userId: userId });
+        const deletedCount = result.deletedCount || 0;
+        console.log(`[Chat Delete All] Deleted ${deletedCount} chats for user ${username} (ID: ${userId}).`);
+        
+        // Send 200 OK with success message and count
+        return res.status(200).json({ 
+            success: true, 
+            message: `Successfully deleted ${deletedCount} chat(s).`, 
+            deletedCount: deletedCount 
+        });
+        // Alternatively, send 204 No Content if no message is needed
+        // return res.status(204).send(); 
+
+    } catch (error: any) {
+        console.error(`[Chat Delete All] Error deleting chats for user ${username} (ID: ${userId}):`, error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error deleting chat history.',
+            error: error.message || String(error)
+        });
+    }
+});
+
 export default router; 
