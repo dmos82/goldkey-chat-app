@@ -1,6 +1,6 @@
 import fs from 'fs/promises';
-import pdf from 'pdf-parse';
 import { generateEmbeddings } from './openaiHelper'; // Assuming helper exists and handles embeddings
+import { extractPdfTextWithPages, chunkTextWithPages, PageText } from './pdfUtils'; // Import necessary functions from pdfUtils
 
 // Define a simple Chunk type (adjust as needed)
 export interface Chunk {
@@ -34,44 +34,41 @@ export async function processAndEmbedDocument(
 
     try {
         const fileBuffer = await fs.readFile(filePath);
-        let fullText = '';
-        let pageChunks: { text: string; pageNum: number }[] = [];
+        let pages: PageText[] = [];
 
-        // --- Text Extraction (Example for PDF) ---
-        // TODO: Add support for other types like TXT, MD
-        if (originalFilename.toLowerCase().endsWith('.pdf')) {
-            const pdfData = await pdf(fileBuffer);
-            fullText = pdfData.text;
-            // Simple page tracking (adjust if more granular chunk-to-page mapping is needed)
-            if (pdfData.numpages > 0) {
-                // Basic approach: iterate through pages if needed, pdf-parse gives text per page
-                // For simplicity here, we'll just use the full text but acknowledge page count
-                console.log(`[DocProcessor] Extracted ${pdfData.numpages} pages from PDF.`);
-            }
-        } else if (originalFilename.toLowerCase().endsWith('.txt') || originalFilename.toLowerCase().endsWith('.md')) {
-            fullText = fileBuffer.toString('utf-8');
+        // --- Text Extraction ---
+        const fileExtension = originalFilename.split('.').pop()?.toLowerCase() || '';
+
+        if (fileExtension === 'pdf') {
+            console.log(`[DocProcessor] Extracting text from PDF using pdfUtils...`);
+            pages = await extractPdfTextWithPages(fileBuffer);
+            console.log(`[DocProcessor] Extracted ${pages.length} pages from PDF.`);
+        } else if (fileExtension === 'txt' || fileExtension === 'md') {
+            const text = fileBuffer.toString('utf-8');
+            pages = [{ pageNumber: 1, text: text }]; // Treat TXT/MD as single page
             console.log(`[DocProcessor] Extracted text from TXT/MD file.`);
         } else {
             console.warn(`[DocProcessor] Unsupported file type for ${originalFilename}. Skipping text extraction.`);
             return { chunks: [], embeddings: [], totalChunks: 0 };
         }
 
-        if (!fullText.trim()) {
+        if (pages.length === 0 || pages.every(p => !p.text.trim())) {
             console.warn(`[DocProcessor] No text content extracted from ${originalFilename}.`);
             return { chunks: [], embeddings: [], totalChunks: 0 };
         }
 
-        // --- Text Chunking (Simple Sliding Window) ---
-        const textChunks: string[] = [];
-        for (let i = 0; i < fullText.length; i += MAX_CHUNK_SIZE - CHUNK_OVERLAP) {
-            const chunk = fullText.substring(i, i + MAX_CHUNK_SIZE);
-            if (chunk.trim()) { // Avoid empty chunks
-                textChunks.push(chunk);
-            }
-        }
-        console.log(`[DocProcessor] Created ${textChunks.length} raw text chunks.`);
+        // --- Text Chunking (Using pdfUtils) ---
+        // Use the default chunk size/overlap from pdfUtils (currently 750/150)
+        const chunkData = chunkTextWithPages(pages);
+        const textChunks = chunkData.map(chunk => chunk.text);
+        const finalChunks: Chunk[] = chunkData.map(chunk => ({ 
+            text: chunk.text, 
+            pageNumbers: chunk.pageNumbers 
+        }));
 
-        if (textChunks.length === 0) {
+        console.log(`[DocProcessor] Created ${finalChunks.length} chunks using pdfUtils chunker.`);
+
+        if (finalChunks.length === 0) {
              console.warn(`[DocProcessor] Text chunking resulted in 0 chunks for ${originalFilename}.`);
              return { chunks: [], embeddings: [], totalChunks: 0 };
         }
@@ -85,12 +82,6 @@ export async function processAndEmbedDocument(
         if (embeddings.length !== textChunks.length) {
              throw new Error(`Mismatch between chunk count (${textChunks.length}) and embedding count (${embeddings.length})`);
         }
-
-        // Combine chunks with metadata (basic example)
-        const finalChunks: Chunk[] = textChunks.map((text) => ({
-            text: text,
-            // pageNumbers: undefined // TODO: Implement more granular page tracking if needed
-        }));
 
         return {
             chunks: finalChunks,
