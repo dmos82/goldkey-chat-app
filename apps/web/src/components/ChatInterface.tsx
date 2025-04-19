@@ -145,15 +145,7 @@ export default function ChatInterface({
     <div className="flex flex-col h-full bg-background-light dark:bg-background-dark text-text-primary-light dark:text-text-primary-dark">
       <div className="flex-grow overflow-y-auto p-4 space-y-6">
         {messages.map((msg: Message, index: number) => {
-            // *** TEMPORARY DEBUG LOG ***
-            if (msg.sender === 'assistant') {
-              console.log(`[ChatInterface Render Debug] Assistant Message ${index}:`, { 
-                  text: msg.text.substring(0, 30) + '...', 
-                  usage: msg.usage, 
-                  cost: msg.cost 
-              });
-            }
-            // *** END DEBUG LOG ***
+            // *** REMOVED TEMPORARY DEBUG LOG ***
             
             return (
               <div 
@@ -177,7 +169,7 @@ export default function ChatInterface({
                     )}
 
                     {/* --- START: Display Usage/Cost for Assistant Messages --- */}
-                    {msg.sender === 'assistant' && msg.usage && msg.cost !== null && msg.cost !== undefined && (
+                    {msg.sender === 'assistant' && msg.usage && typeof msg.cost === 'number' && (
                       <TooltipProvider delayDuration={300}>
                         <Tooltip>
                           <TooltipTrigger asChild>
