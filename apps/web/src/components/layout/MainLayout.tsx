@@ -225,6 +225,21 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
           </Link>
         )}
 
+        {/* Usage Page Link */}
+        <Link href="/usage" passHref>
+          <Button
+            variant="ghost"
+            className={cn(
+              "w-full justify-start mb-2 text-left text-primary-foreground",
+              "transition-all duration-200 ease-in-out hover:bg-muted/10 hover:scale-[1.02] active:scale-[0.98]"
+              // Add active state styling if needed, e.g., based on current pathname
+            )}
+          >
+            <User className="mr-2 h-4 w-4" /> {/* Using User icon for now */}
+            Usage
+          </Button>
+        </Link>
+
         {/* Restyled CHATS Title */}
         <Label className="px-3 py-1 mb-2 text-lg font-semibold text-primary-foreground uppercase border rounded-md border-border"> 
           Chats

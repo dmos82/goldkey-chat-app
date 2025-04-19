@@ -69,4 +69,20 @@ export interface ChatDetail {
   messages: FrontendChatMessage[];
 }
 
+// Type for the response from POST /api/chat
+export interface ChatApiResponse {
+  success: boolean;
+  answer?: string;
+  sources?: Source[];
+  usage?: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  } | null;
+  cost?: number | null;
+  chatId?: string; // Can be null/undefined for new chats initially
+  persistenceError?: string; // Optional error message
+  message?: string; // Optional general message from backend
+}
+
 // Export other types from this directory if needed 
