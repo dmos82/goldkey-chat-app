@@ -194,8 +194,12 @@ export default function Home() {
       }
     };
 
-    loadMessages();
-  }, [selectedChatId, token, logout]); // Removed loadChatList from deps
+    // Call the async function
+    // --- TEMPORARILY DISABLED FOR DEBUGGING ---
+    // loadMessages();
+    // -----------------------------------------
+
+  }, [selectedChatId, token, logout]); // Dependencies
 
   // --- Handlers ---
   const handleUploadSuccess = () => {
