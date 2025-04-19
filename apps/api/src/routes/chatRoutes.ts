@@ -287,6 +287,7 @@ router.post('/', async (req: Request, res: Response): Promise<void | Response> =
         responseObject.cost = requestCost; // Add cost (will be 0 if usage was missing)
 
         console.log('[Chat] Sending final response. Answer length:', answer.length, 'Sources count:', responseObject.sources.length, 'Usage:', usageData !== null, 'Cost:', requestCost);
+        console.log('[Chat] Final Response Object:', responseObject); // Add temporary log
 
 
         // --- Start Chat Persistence Logic ---
