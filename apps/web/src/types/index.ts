@@ -15,10 +15,16 @@ export interface Document {
 // Frontend representation of a message
 export interface Message {
   _id?: string; // Added optional _id for list keys
-  sender: 'user' | 'assistant';
+  sender: 'user' | 'assistant' | 'system' | 'loading';
   text: string;
   sources?: Source[];
   timestamp?: string; // Added optional timestamp
+  usage?: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  } | null;
+  cost?: number | null;
 }
 
 // Frontend representation of a source

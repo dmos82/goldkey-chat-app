@@ -7,6 +7,12 @@ import { Message, Source } from '@/types'; // Import types from centralized loca
 import { API_BASE_URL } from '@/lib/config';
 import { Button } from '@/components/ui/button';
 import { FileText } from 'lucide-react';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 // Define search mode type
 type SearchMode = 'system' | 'user';
@@ -158,6 +164,27 @@ export default function ChatInterface({
                 ) : (
                   <p className="text-sm whitespace-pre-wrap text-black dark:text-white">{msg.text}</p>
                 )}
+
+                {/* --- START: Display Usage/Cost for Assistant Messages --- */}
+                {msg.sender === 'assistant' && msg.usage && msg.cost !== null && msg.cost !== undefined && (
+                  <TooltipProvider delayDuration={300}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="mt-2 pt-1 border-t border-gray-300 dark:border-gray-600">
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            Usage: {msg.usage.total_tokens} tokens | Cost: ${msg.cost.toFixed(6)}
+                          </p>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="text-xs bg-background dark:bg-accent text-foreground dark:text-accent-foreground border border-border rounded-md shadow-lg p-2">
+                        <p>Prompt Tokens: {msg.usage.prompt_tokens}</p>
+                        <p>Completion Tokens: {msg.usage.completion_tokens}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+                {/* --- END: Display Usage/Cost --- */}
+
                 {msg.sources && msg.sources.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-2 items-center text-xs">
                     <span className="font-semibold mr-1">Sources:</span>

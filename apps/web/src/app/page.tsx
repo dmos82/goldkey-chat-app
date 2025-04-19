@@ -319,45 +319,53 @@ export default function Home() {
     }
   };
 
-  // Renamed and updated handler: Called by ChatInterface after successful POST /api/chat
+  // *** MODIFIED: handleNewMessages to include usage/cost ***
   const handleNewMessages = (userQuery: string, apiResponseData: any) => {
-    console.log('[handleNewMessages] Received Data:', { userQuery, apiResponseData }); // Log input
+    console.log('[handleNewMessages] User Query:', userQuery);
+    console.log('[handleNewMessages] API Response:', apiResponseData);
 
-    // Construct messages
-    const userMessage: Message = {
-        _id: `user-temp-${Date.now()}`, // Add temporary ID
-        sender: 'user' as const, // Use 'sender'
-        text: userQuery,
-        sources: [],
-        timestamp: new Date().toISOString()
-    };
-    const assistantMessage: Message = {
-        _id: apiResponseData.messageId || `asst-temp-${Date.now()}`, // Add temporary/API ID
-        sender: 'assistant' as const, // Use 'sender'
-        text: apiResponseData.answer,      // Correct key based on logs for the second message
-        sources: apiResponseData.sources?.map((s: any) => ({ // Assuming source structure
-            source: s.fileName || 'Unknown File', // Add default
-            pageNumbers: s.pageNumbers || [], // Add default
-            documentId: s.documentId || '', // Add default
-            type: s.type || 'unknown', // Add default
-            // _id might not exist on source, removed if not part of type
-        })) || [],
-        timestamp: new Date().toISOString()
+    const newUserMessage: Message = {
+      sender: 'user',
+      text: userQuery,
+      timestamp: new Date().toISOString()
+      // No usage/cost for user messages
     };
 
-    setCurrentMessages(prevMessages => {
-      const nextMessages = [...prevMessages, userMessage, assistantMessage];
-      return nextMessages;
-    });
+    const newAssistantMessage: Message = {
+      sender: 'assistant',
+      text: apiResponseData.answer || 'No response text found.',
+      sources: apiResponseData.sources?.map((s: any) => ({ 
+          source: s.fileName, // Map fileName to source
+          pageNumbers: s.pageNumbers || [], // Ensure pageNumbers is an array
+          documentId: s.documentId,
+          type: s.type
+      })) || [],
+      timestamp: new Date().toISOString(),
+      // *** ADDED: Store usage and cost if available ***
+      usage: apiResponseData.usage || null,
+      cost: apiResponseData.cost !== undefined ? apiResponseData.cost : null,
+    };
 
-    setIsLoadingMessages(false); // Use the correct state setter
+    // Update state
+    setCurrentMessages(prevMessages => [...prevMessages, newUserMessage, newAssistantMessage]);
 
-    // If this was the first message in a new chat, we need the new chat ID
-    // and need to refresh the chat list and select the new chat
+    // Update chat list if it's a new chat
     if (!selectedChatId && apiResponseData.chatId) {
+      // Refresh chat list to include the new chat (and potentially title)
+      loadChatList();
+      // Select the newly created chat
       setSelectedChatId(apiResponseData.chatId);
-      loadChatList(); // Refresh the chat list to include the new chat
+    } else if (selectedChatId === apiResponseData.chatId) {
+      // If it's the current chat, update its entry in the list (for updatedAt)
+      setChats(prevChats => 
+        prevChats.map(chat => 
+          chat._id === selectedChatId ? { ...chat, updatedAt: new Date().toISOString() } : chat
+        ).sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()) // Re-sort
+      );
+    } else if (selectedChatId && !apiResponseData.chatId) {
+      console.warn('[handleNewMessages] API response did not return a chatId for an existing chat update.');
     }
+
   };
 
   // --- New Delete Chat Handler ---
