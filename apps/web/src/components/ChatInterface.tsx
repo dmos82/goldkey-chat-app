@@ -173,7 +173,7 @@ export default function ChatInterface({
                       <TooltipProvider delayDuration={300}>
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <div className="mt-2 pt-1 border-t border-gray-300 dark:border-gray-600">
+                            <div className="mt-2 pt-1 border-t border-gray-300 dark:border-gray-600 bg-red-500 border-4 border-lime-400">
                               <p className="text-xs text-gray-500 dark:text-gray-400">
                                 Usage: {msg.usage.total_tokens} tokens | Cost: ${msg.cost.toFixed(6)}
                               </p>
