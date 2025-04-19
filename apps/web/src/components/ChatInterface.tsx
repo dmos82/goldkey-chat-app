@@ -186,14 +186,7 @@ export default function ChatInterface({
                         </Tooltip>
                       </TooltipProvider>
                     ) : (
-                      // *** ADDED: Log when condition fails for assistant message ***
-                      // Execute log, then explicitly return null
-                      (() => { 
-                          if (msg.sender === 'assistant') {
-                              console.log(`[Debug Render Cond Fail] sender: ${msg.sender}, usage: ${!!msg.usage}, costType: ${typeof msg.cost}`);
-                          }
-                          return null;
-                      })()
+                      null // Return null if condition fails
                     )}
                     {/* --- END: Display Usage/Cost --- */}
 
