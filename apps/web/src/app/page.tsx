@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useAuth } from '@/context/AuthContext'; // Reverted to Alias Path
+import { v4 as uuidv4 } from 'uuid';
 // --- Ensure backend imports are removed ---
 // import { Chat, IChatMessage as Message } from '../../api/src/models/ChatModel'; 
 
@@ -319,54 +320,119 @@ export default function Home() {
     }
   };
 
-  // *** MODIFIED: handleNewMessages to include usage/cost ***
-  const handleNewMessages = (userQuery: string, apiResponseData: any) => {
+  // *** REPLACED FUNCTION BODY ***
+  const handleNewMessages = (
+    userQuery: string,
+    apiResponseData: any, // Use the specific ChatApiResponse type below if preferred
+    chatId?: string | null // Optional: Pass current chatId to avoid relying on state
+  ) => {
     console.log('[handleNewMessages] User Query:', userQuery);
     console.log('[handleNewMessages] API Response:', apiResponseData);
-
-    const newUserMessage: Message = {
+  
+    if (!apiResponseData.success || !apiResponseData.answer) {
+      console.error('[handleNewMessages] API response unsuccessful or missing answer.');
+      // Optionally show a toast message here
+      toast({ 
+          variant: "destructive", 
+          title: "API Error", 
+          description: apiResponseData.message || "Failed to get a valid response from the assistant."
+      });
+      return;
+    }
+  
+    const userMessageForState: Message = {
+      _id: uuidv4(), // Use uuid for temporary frontend ID
       sender: 'user',
       text: userQuery,
-      timestamp: new Date().toISOString()
-      // No usage/cost for user messages
-    };
-
-    const newAssistantMessage: Message = {
-      sender: 'assistant',
-      text: apiResponseData.answer || 'No response text found.',
-      sources: apiResponseData.sources?.map((s: any) => ({ 
-          source: s.fileName, // Map fileName to source
-          pageNumbers: s.pageNumbers || [], // Ensure pageNumbers is an array
-          documentId: s.documentId,
-          type: s.type
-      })) || [],
       timestamp: new Date().toISOString(),
-      // *** ADDED: Store usage and cost if available ***
-      usage: apiResponseData.usage || null,
-      cost: apiResponseData.cost !== undefined ? apiResponseData.cost : null,
     };
+  
+    const assistantMessage: Message = {
+      _id: uuidv4(), // Use uuid for temporary frontend ID
+      sender: 'assistant',
+      text: apiResponseData.answer,
+      sources: apiResponseData.sources || [], // Provide default empty array
+      usage: apiResponseData.usage,
+      cost: apiResponseData.cost,
+      timestamp: new Date().toISOString(),
+    };
+  
+    // --- TEMPORARY DEBUG LOG 1 ---
+    console.log('[handleNewMessages Debug] Assistant Message BEFORE state update:', {
+      sender: assistantMessage.sender,
+      usage: assistantMessage.usage,
+      cost: assistantMessage.cost
+    });
+    // -----------------------------
 
-    // Update state
-    setCurrentMessages(prevMessages => [...prevMessages, newUserMessage, newAssistantMessage]);
+    // Update messages state
+    setCurrentMessages(prevMessages => [
+      ...prevMessages,
+      userMessageForState,
+      assistantMessage,
+    ]);
+  
+    // --- Revised Chat List Update Logic ---
+    const currentChatId = chatId || selectedChatId; // Use passed chatId or state
+    const responseChatId = apiResponseData.chatId;
 
-    // Update chat list if it's a new chat
-    if (!selectedChatId && apiResponseData.chatId) {
-      // Refresh chat list to include the new chat (and potentially title)
-      loadChatList();
-      // Select the newly created chat
-      setSelectedChatId(apiResponseData.chatId);
-    } else if (selectedChatId === apiResponseData.chatId) {
-      // If it's the current chat, update its entry in the list (for updatedAt)
-      setChats(prevChats => 
-        prevChats.map(chat => 
-          chat._id === selectedChatId ? { ...chat, updatedAt: new Date().toISOString() } : chat
-        ).sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()) // Re-sort
-      );
-    } else if (selectedChatId && !apiResponseData.chatId) {
-      console.warn('[handleNewMessages] API response did not return a chatId for an existing chat update.');
+    if (responseChatId && responseChatId !== currentChatId) {
+      // Scenario 1: New chat was created by the backend
+      console.log(`[handleNewMessages] New chat created with ID: ${responseChatId}. Updating list and selecting.`);
+      
+      // Check if chat already exists in list (e.g., race condition or prior fetch)
+      const chatExists = chats.some(c => c._id === responseChatId);
+      
+      if (!chatExists) {
+        const newChatEntry: ChatSummary = {
+          _id: responseChatId,
+          chatName: userQuery.substring(0, 40) + (userQuery.length > 40 ? "..." : "") || "New Chat",
+          updatedAt: new Date().toISOString(),
+          createdAt: new Date().toISOString(), // Approximate createdAt
+        };
+        // Add to list and re-sort
+        setChats(prev => 
+          [newChatEntry, ...prev]
+          .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+        );
+      } else {
+        // If it somehow exists, just update timestamp
+        setChats(prev => 
+          prev.map(c => c._id === responseChatId ? { ...c, updatedAt: new Date().toISOString() } : c)
+          .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+        );
+      }
+      setSelectedChatId(responseChatId); // Select the new/updated chat
+
+    } else if (currentChatId && responseChatId === currentChatId) {
+      // Scenario 2: Message added to the currently selected chat
+      // Update timestamp in the list for sorting
+       console.log(`[handleNewMessages] Message added to existing chat: ${currentChatId}. Updating timestamp.`);
+       setChats(prev => 
+         prev.map(c => c._id === currentChatId ? { ...c, updatedAt: new Date().toISOString() } : c)
+         .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+       );
+    } else {
+      // Scenario 3: Unclear state (e.g., no chatId returned, selectedChatId mismatch)
+      console.warn('[handleNewMessages] Chat ID status unclear. Response Chat ID:', responseChatId, 'Current/Selected Chat ID:', currentChatId);
+      // Consider reloading chat list as a fallback if state seems inconsistent
+      // loadChatList(); 
     }
-
+    // --- End Revised Chat List Update Logic ---
   };
+
+  // --- TEMPORARY DEBUG LOG 2 ---
+  if (currentMessages.length > 0) {
+      const lastMessage = currentMessages[currentMessages.length - 1];
+      if(lastMessage.sender === 'assistant') {
+          console.log('[Page Render Debug] currentMessages LAST message (ASSISTANT) BEFORE prop pass:', {
+              sender: lastMessage.sender,
+              usage: lastMessage.usage,
+              cost: lastMessage.cost
+          });
+      }
+  }
+  // -----------------------------
 
   // --- New Delete Chat Handler ---
   const handleConfirmDelete = async (chatIdToDelete: string) => {
@@ -417,19 +483,17 @@ export default function Home() {
       toast({ variant: "destructive", title: "Error", description: "Authentication token not found." });
       return;
     }
-    setIsDeletingAll(true); // Reuse deleting state or create a new one? Reusing for now.
+    setIsDeletingAll(true);
 
     try {
-      // Use the dedicated endpoint for deleting all chats
-      const response = await fetch(`${API_BASE_URL}/api/chat/all`, { // <-- Endpoint for deleting all chats
+      const response = await fetch(`${API_BASE_URL}/api/chat/all`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` },
       });
 
-      const result = await response.json(); // Try to parse JSON regardless of status
+      const result = await response.json();
 
       if (!response.ok) {
-        // Use message from backend if available, otherwise use status text
         const errorMsg = result?.message || response.statusText || `Failed to delete all chats (${response.status})`;
         throw new Error(errorMsg);
       }
@@ -438,173 +502,16 @@ export default function Home() {
       toast({ title: "Success", description: result.message || "All chats deleted successfully." });
 
       // Update frontend state
-      setChats([]); // Clear the chat list
-      setSelectedChatId(null); // Unselect any active chat
-      setCurrentMessages([]); // Clear messages
+      setChats([]); // Clear all chats
+      setSelectedChatId(null); // Clear selected chat
+      setCurrentMessages([]); // Clear current messages
 
     } catch (error: any) {
       console.error("[Delete All Chats] Error deleting chats:", error);
       toast({ variant: "destructive", title: "Error Deleting Chats", description: error.message });
     } finally {
-        setIsDeletingAll(false); // Reset loading state
-    }
-  };
-
-  // --- Handler for Deleting ALL User Documents ---
-  const handleDeleteAllDocuments = async () => {
-    if (!token) {
-      toast({ variant: "destructive", title: "Error", description: "Authentication token not found." });
-      return;
-    }
-    setIsDeletingAll(true);
-    console.log('[Delete All Docs] Initiating deletion...');
-
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/documents/user/all`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
-
-      const result = await response.json(); // Assume backend sends JSON response
-
-      if (!response.ok) {
-        throw new Error(result.message || `Failed to delete documents (${response.status})`);
-      }
-
-      console.log('[Delete All Docs] Success:', result);
-      toast({ title: "Success", description: result.message || "All documents deleted." });
-      // Refresh the document list by changing the key
-      setRefreshKey(prev => prev + 1);
-
-    } catch (error: any) {
-      console.error('[Delete All Docs] Error:', error);
-      toast({ 
-        variant: "destructive", 
-        title: "Error Deleting Documents", 
-        description: error.message || "An unknown error occurred."
-      });
-    } finally {
       setIsDeletingAll(false);
     }
   };
 
-  // Clean up Blob URL on unmount (consider moving to modal if more robust handling needed)
-  useEffect(() => {
-    return () => {
-      if (modalFileUrl && modalFileUrl.startsWith('blob:')) {
-        URL.revokeObjectURL(modalFileUrl);
-      }
-    };
-  }, [modalFileUrl]);
-
-  return (
-    <ProtectedRoute>
-      <MainLayout
-        activeView={activeView}
-        setActiveView={setActiveView}
-        isKbOverlayVisible={isKbOverlayVisible}
-        setIsKbOverlayVisible={setIsKbOverlayVisible}
-        handleKbFileClick={(docId, sourceType, fileName) => handleFileClick({ documentId: docId, type: sourceType, source: fileName })}
-        chatContext={chatContext}
-        setChatContext={setChatContext}
-        // Pass chat state and handlers to MainLayout (for sidebar)
-        chats={chats}
-        selectedChatId={selectedChatId}
-        isLoadingChats={isLoadingChats}
-        handleNewChat={handleNewChat}
-        handleSelectChat={handleSelectChat}
-        handleConfirmDelete={handleConfirmDelete}
-        onDeleteAllChats={handleConfirmDeleteAllChats}
-      >
-        {/* --- Main Content Area (Passed as children to MainLayout) --- */}
-        <div id="content-switcher" className="p-4 h-full"> {/* Use h-full if chat needs it */}
-          {/* Display Chat Error if any */}
-          {chatError && activeView === 'chat' && (
-              <div className="mb-4 p-3 bg-destructive/10 border border-destructive/30 text-destructive text-sm rounded-md">
-                  Chat Error: {chatError}
-              </div>
-          )}
-
-          {/* --- CHAT VIEW --- */}
-          {activeView === 'chat' && (
-            <div id="chat-view" className="h-full flex flex-col">
-              {/* ChatInterface handles internal scrolling and layout */}
-              <ChatInterface
-                  // Key prop forces remount (and state reset) when chat ID changes, essential if it keeps internal state
-                  // key={selectedChatId || 'new-chat'} 
-                  chatId={selectedChatId} // Pass selected chat ID
-                  messages={currentMessages} // Pass current messages
-                  isLoadingMessages={isLoadingMessages} // Pass loading state
-                  // Pass the updated handleFileClick
-                  onSourceClick={handleFileClick} 
-                  chatContext={chatContext}
-                  onNewMessages={handleNewMessages} // Pass renamed handler
-              />
-            </div>
-          )}
-
-          {/* --- DOCS VIEW --- */}
-          {activeView === 'docs' && (
-            <div className="space-y-4">
-              <div className="space-y-4">
-                  <div className="bg-card dark:bg-card rounded-md p-4 shadow"> 
-                     <FileUpload onUploadSuccess={handleUploadSuccess} />
-                  </div>
-                  <div className="bg-card dark:bg-card rounded-md p-4 shadow space-y-4">
-                    {/* --- Document List Component --- */}
-                     <DocumentList
-                        key={refreshKey}
-                        onOpenFile={(docId: string, fileName: string) => handleFileClick({ documentId: docId, type: 'user', source: fileName })} 
-                      />
-                      
-                    {/* --- Delete All Button and Dialog --- */}
-                    <div className="pt-4 border-t border-border">
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="destructive" disabled={isDeletingAll}>
-                            <Trash2 className="mr-2 h-4 w-4" /> 
-                            {isDeletingAll ? 'Deleting...' : 'Delete All My Documents'}
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Confirm Deletion</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Are you sure you want to permanently delete ALL your uploaded documents?
-                              This action cannot be undone and will remove all associated data.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction 
-                              onClick={handleDeleteAllDocuments} 
-                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                            >
-                              Delete All
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </div>
-                  </div>
-              </div>
-            </div>
-          )}
-        </div> {/* End #content-switcher */}
-
-        {/* PDF Viewer Modal - Rendered outside MainLayout's children */} 
-        {/* Modal logic moved outside MainLayout children rendering area */}
-        {isModalOpen && modalFileUrl && (
-          <PdfViewerModal
-            isOpen={isModalOpen}
-            onClose={closeModal}
-            fileUrl={modalFileUrl}
-            initialPageNumber={modalInitialPage ?? 1}
-            chunkText={modalHighlightText}
-            title={modalTitle}
-          />
-        )}
-      </MainLayout>
-    </ProtectedRoute>
-  );
 }
