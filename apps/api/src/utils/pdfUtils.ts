@@ -1,10 +1,12 @@
-// Adjust import for pdfjs-dist in Node.js
+// Use require with legacy path for pdfjs-dist in Node.js
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const pdfjsLib = require('pdfjs-dist/build/pdf.js'); 
+const pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js');
 
-// Set workerSrc explicitly for Node.js environment (even if legacy build)
+// Set workerSrc explicitly for Node.js environment if needed
 // This might point to a file within the pdfjs-dist package itself
-// pdfjsLib.GlobalWorkerOptions.workerSrc = `./node_modules/pdfjs-dist/build/pdf.worker.js`; // Common pattern
+// Try resolving the path to ensure it's correct in the runtime environment
+// const workerSrc = require.resolve('pdfjs-dist/legacy/build/pdf.worker.js');
+// pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
 
 export interface PageText {
     pageNumber: number;
@@ -46,9 +48,10 @@ export async function extractPdfTextWithPages(pdfBuffer: Buffer): Promise<PageTe
     // Load the PDF document from the buffer
     const loadingTask = pdfjsLib.getDocument({ 
         data: new Uint8Array(pdfBuffer), // pdfjs expects Uint8Array
-        // cMapUrl: './node_modules/pdfjs-dist/cmaps/', // CMap settings might not be needed with require
+        // cMapUrl and standardFontDataUrl are less likely needed with legacy build/worker setup
+        // cMapUrl: './node_modules/pdfjs-dist/cmaps/', 
         // cMapPacked: true, 
-        // standardFontDataUrl: './node_modules/pdfjs-dist/standard_fonts/' // Font settings might not be needed
+        // standardFontDataUrl: './node_modules/pdfjs-dist/standard_fonts/'
     });
 
     try {
