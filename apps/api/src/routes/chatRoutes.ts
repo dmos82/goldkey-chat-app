@@ -236,6 +236,26 @@ router.post('/', async (req: Request, res: Response): Promise<void | Response> =
         const completion = await getChatCompletion(messages);
         console.timeEnd('OpenAICallDuration');
 
+        // --- Start Token Usage & Cost Calculation ---
+        let requestCost = 0;
+        let usageData = null;
+        const GPT41_MINI_PRICE_PER_PROMPT_TOKEN = 0.40 / 1000000;
+        const GPT41_MINI_PRICE_PER_COMPLETION_TOKEN = 1.60 / 1000000;
+
+        if (completion && completion.usage) {
+            usageData = completion.usage; // Store the usage object
+            const promptTokens = completion.usage.prompt_tokens || 0;
+            const completionTokens = completion.usage.completion_tokens || 0;
+
+            // Calculate cost using specified GPT-4.1 Mini prices
+            requestCost = (promptTokens * GPT41_MINI_PRICE_PER_PROMPT_TOKEN) + (completionTokens * GPT41_MINI_PRICE_PER_COMPLETION_TOKEN);
+
+            console.log(`[Chat Cost Calc - Route] Tokens: P${promptTokens}/C${completionTokens}. Model: ${completion.model}. Cost: $${requestCost.toFixed(6)}`);
+        } else {
+            console.warn('[Chat Cost Calc - Route] Token usage data not found in OpenAI completion object.');
+        }
+        // --- End Token Usage & Cost Calculation ---
+
         if (!completion?.choices?.[0]?.message?.content) {
             console.error('[Chat] Failed to get completion from OpenAI or received null/empty response.');
             throw new Error('Failed to get response from AI assistant.');
@@ -259,7 +279,14 @@ router.post('/', async (req: Request, res: Response): Promise<void | Response> =
             answer,
             sources: finalSourcesForResponse // Use the ranked & deduplicated sources
         };
-        console.log('[Chat] Sending final response. Answer length:', answer.length, 'Sources count:', responseObject.sources.length);
+
+        // Add usage and cost to the response object
+        if (usageData) {
+            responseObject.usage = usageData;
+        }
+        responseObject.cost = requestCost; // Add cost (will be 0 if usage was missing)
+
+        console.log('[Chat] Sending final response. Answer length:', answer.length, 'Sources count:', responseObject.sources.length, 'Usage:', usageData !== null, 'Cost:', requestCost);
 
 
         // --- Start Chat Persistence Logic ---
