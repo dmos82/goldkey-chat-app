@@ -645,4 +645,31 @@ router.delete('/system-kb/all', protect, isAdmin, async (req: Request, res: Resp
     }
 });
 
+// --- GET All User Usage Data ---
+router.get('/usage', async (req: Request, res: Response): Promise<void | Response> => {
+    console.log(`[Admin Usage] Request received to fetch usage for all users.`);
+    try {
+        const usersUsage = await User.find({}) // Find all users
+            .select('username role usageMonthMarker currentMonthPromptTokens currentMonthCompletionTokens currentMonthCost')
+            .lean(); // Use lean for performance
+
+        // Optional: Add totalTokens to each user object
+        const formattedUsage = usersUsage.map(u => ({
+            ...u,
+            totalTokens: (u.currentMonthPromptTokens || 0) + (u.currentMonthCompletionTokens || 0)
+        }));
+
+        console.log(`[Admin Usage] Found usage data for ${formattedUsage.length} users.`);
+        res.status(200).json({ success: true, usersUsage: formattedUsage });
+
+    } catch (error) {
+        console.error('[Admin Usage] Error fetching all users usage:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Failed to fetch user usage data.', 
+            error: error instanceof Error ? error.message : String(error)
+        });
+    }
+});
+
 export default router; 
