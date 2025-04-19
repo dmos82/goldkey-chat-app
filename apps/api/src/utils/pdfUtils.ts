@@ -62,8 +62,8 @@ export async function extractPdfTextWithPages(pdfBuffer: Buffer): Promise<PageTe
  */
 export function chunkTextWithPages(
   pages: PageText[],
-  chunkSize: number = 1000,
-  overlap: number = 100
+  chunkSize: number = 750,
+  overlap: number = 150
 ): { text: string; pageNumbers: number[]; }[] {
   const chunks: { text: string; pageNumbers: number[]; }[] = [];
   
