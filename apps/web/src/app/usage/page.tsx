@@ -1,10 +1,13 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { API_BASE_URL } from '@/lib/config';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import { ArrowLeft } from 'lucide-react';
 // import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"; // Temporarily removed
 // import { Terminal } from 'lucide-react'; // Temporarily removed
 
@@ -71,7 +74,15 @@ export default function UsagePage() {
 
   return (
     <div className="p-4 md:p-6 lg:p-8 space-y-6">
-      <h1 className="text-2xl md:text-3xl font-semibold tracking-tight text-foreground">Monthly Usage</h1>
+      <div className="flex justify-between items-center mb-4">
+        <h1 className="text-2xl md:text-3xl font-semibold tracking-tight text-foreground">Monthly Usage</h1>
+        <Link href="/" passHref>
+          <Button variant="outline">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Chat
+          </Button>
+        </Link>
+      </div>
       <p className="text-muted-foreground">
         Track your estimated token usage and cost for the current billing cycle.
       </p>
