@@ -159,10 +159,13 @@ export default function Home() {
         const chatDetails: ChatDetail = await fetchChatDetails(selectedChatId, token);
         console.log('[Effect loadMessages] Received chatDetails:', chatDetails); // Log fetched data
 
-        // --- CORRECTED MAPPING & MERGE LOGIC ---
+        // --- REFINED MAPPING & MERGE LOGIC ---
         // Map messages from API response (using FrontendChatMessage structure)
-        const newMessagesFromApi = chatDetails.messages.map(msg => ({
-            _id: (msg as any)._id, // Attempt to access _id if it exists, maybe type needs update?
+        // IMPORTANT: We are assuming msg._id exists in the response from fetchChatDetails
+        // even though it's not strictly in the FrontendChatMessage type.
+        // A type update or backend confirmation would be ideal.
+        const newMessagesFromApi: Message[] = chatDetails.messages.map(msg => ({
+            _id: (msg as any)._id, // Map assumed _id
             sender: msg.role,
             text: msg.content,
             sources: msg.sources?.map(s => ({
@@ -171,35 +174,36 @@ export default function Home() {
                 documentId: s.documentId,
                 type: s.type
             })) || [],
-            // Assume usage/cost aren't part of FrontendChatMessage type yet - handle in UI only?
-            // usage: (msg as any).usage || null, 
-            // cost: (msg as any).cost !== undefined ? (msg as any).cost : null,
-            usage: null, // Set to null for historical messages if not in type
-            cost: null, // Set to null for historical messages if not in type
+            usage: null, // Set historical usage to null
+            cost: null,  // Set historical cost to null
             timestamp: msg.timestamp ? new Date(msg.timestamp).toISOString() : new Date().toISOString()
         }));
 
-        // --- Use functional update to merge fetched and optimistic messages ---
+        // --- Refined functional update to merge fetched and optimistic messages ---
         setCurrentMessages(prevMessages => {
-            // Identify optimistic messages: those in prevMessages not having a matching _id in newMessagesFromApi
-            const optimisticMessages = prevMessages.filter(
-                // Ensure both _ids exist before comparing
-                pMsg => pMsg._id && !newMessagesFromApi.some(apiMsg => apiMsg._id && apiMsg._id === pMsg._id)
+            // Create a Set of IDs from the fetched messages for quick lookup
+            const fetchedMessageIds = new Set(newMessagesFromApi.map(msg => msg._id).filter(id => id));
+
+            // Filter previous messages to keep only those NOT present in the fetched list (optimistic)
+            const optimisticMessagesToKeep = prevMessages.filter(
+                pMsg => !pMsg._id || !fetchedMessageIds.has(pMsg._id)
             );
 
-            // Combine the fetched messages with the unique optimistic ones
-            const combinedMessages = [
-                ...newMessagesFromApi,
-                ...optimisticMessages
-            ];
+            // Combine the definitive list from the API with the optimistic ones not yet confirmed
+            let combined = [...newMessagesFromApi, ...optimisticMessagesToKeep];
 
-            console.log(`[loadMessages] Merged ${newMessagesFromApi.length} fetched with ${optimisticMessages.length} optimistic messages. Total: ${combinedMessages.length}`);
-            // Sort combined messages by timestamp to ensure correct order
-            return combinedMessages.sort((a, b) => 
+            // Optional: Deduplicate if needed (e.g., if optimistic msg got ID late)
+            // combined = Array.from(new Map(combined.map(msg => [msg._id || msg.timestamp, msg])).values());
+
+            // Sort by timestamp to maintain order
+            combined.sort((a, b) => 
                 new Date(a.timestamp || 0).getTime() - new Date(b.timestamp || 0).getTime()
             );
+
+            console.log(`[loadMessages Refined] Merged ${newMessagesFromApi.length} fetched with ${optimisticMessagesToKeep.length} optimistic. Total: ${combined.length}`);
+            return combined;
         });
-        console.log('[Effect loadMessages] State update queued with merged messages.'); // Log after setting state
+        console.log('[Effect loadMessages] State update queued with refined merged messages.');
 
       } catch (error: any) {
         console.error(`Error fetching messages for chat ${selectedChatId}:`, error);
