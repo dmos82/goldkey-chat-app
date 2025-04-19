@@ -6,7 +6,7 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "nodemon --watch src --ext ts,json --exec ts-node --transpile-only src/index.ts",
-    "build": "tsup src/index.ts --format cjs --dts --clean --external pdf-parse",
+    "build": "tsup src/index.ts --format cjs --dts --clean --external pdf-parse --external pdfjs-dist",
     "start": "node --preserve-symlinks dist/index.js",
     "load-kb": "ts-node src/scripts/loadSystemKnowledge.ts",
     "lint": "eslint src --ext .ts,.tsx",
