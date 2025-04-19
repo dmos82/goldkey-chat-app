@@ -1,18 +1,4 @@
-// Use require with legacy path for pdfjs-dist in Node.js
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js');
-
-// --- Set Worker Source ---
-try {
-    const workerSrcPath = require.resolve('pdfjs-dist/legacy/build/pdf.worker.js');
-    pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrcPath;
-    console.log(`[pdfUtils] Set pdfjs workerSrc to: ${workerSrcPath}`);
-} catch (error) {
-    console.error("[pdfUtils] Failed to resolve pdf.worker.js path. PDF processing might fail.", error);
-    // Throw an error here to prevent the server starting with broken PDF processing
-    throw new Error("Failed to configure PDF worker. Cannot start server.");
-}
-// -------------------------
+import pdf from 'pdf-parse';
 
 export interface PageText {
     pageNumber: number;
@@ -47,58 +33,31 @@ export function renderPageWithNumber(pageData: any): Promise<string> {
 }
 
 /**
- * Extracts text from a PDF buffer page by page using pdfjs-dist.
+ * Extracts text from a PDF buffer using pdf-parse.
+ * Returns text mapped to page numbers (though pdf-parse v1 doesn't easily separate pages).
+ * For simplicity, it returns an array containing one entry with the full text and page 1.
+ * Callers might need adjustment if page-specific chunking was relying on the previous structure.
  */
 export async function extractPdfTextWithPages(pdfBuffer: Buffer): Promise<PageText[]> {
-    const pages: PageText[] = [];
-    // Load the PDF document from the buffer
-    const loadingTask = pdfjsLib.getDocument({ 
-        data: new Uint8Array(pdfBuffer) // pdfjs expects Uint8Array
-        // No cMapUrl or standardFontDataUrl needed when worker is set correctly
-    });
-
+    console.log("[pdfUtils] Extracting PDF text using pdf-parse...");
     try {
-        const pdfDocument = await loadingTask.promise;
-        console.log(`[pdfUtils] PDF loaded with ${pdfDocument.numPages} pages using pdfjs-dist.`);
-
-        for (let i = 1; i <= pdfDocument.numPages; i++) {
-            const page = await pdfDocument.getPage(i);
-            const textContent = await page.getTextContent();
-            
-            // Join text items, preserving some structure (e.g., line breaks)
-            let pageText = '';
-            let lastY: number | undefined;
-            textContent.items.forEach((item: any) => { // Use 'any' for simplicity, or define TextItem interface
-                if (lastY !== undefined && item.transform[5] < lastY) { // Heuristic for new line
-                    pageText += '\\n';
-                }
-                pageText += item.str + ' '; // Add space between items
-                lastY = item.transform[5];
-            });
-
-            const trimmedText = pageText.trim().replace(/\s+/g, ' '); // Normalize whitespace
-
-            if (trimmedText) {
-                 pages.push({
-                    pageNumber: i,
-                    text: trimmedText
-                });
-            } else {
-                 console.log(`[pdfUtils] Page ${i} yielded no text content.`);
-            }
+        const data = await pdf(pdfBuffer); 
+        // pdf-parse combines text. Return as single page for consistency with interface.
+        const text = data.text?.trim() || '';
+        console.log(`[pdfUtils] pdf-parse extracted text. Length: ${text.length}, Pages: ${data.numpages}`);
+        if (text) {
+             return [{ pageNumber: 1, text: text }]; // Return full text as page 1
+        } else {
+             return [];
         }
-        console.log(`[pdfUtils] Successfully extracted text from ${pages.length} pages using pdfjs-dist.`);
     } catch (error: any) {
-        console.error('[pdfUtils] Error extracting PDF text with pdfjs-dist:', error);
-        // Rethrow or handle error appropriately
-        throw new Error(`Failed to extract text using pdfjs-dist: ${error.message || String(error)}`);
+        console.error('[pdfUtils] Error extracting PDF text with pdf-parse:', error);
+        throw new Error(`Failed to extract text using pdf-parse: ${error.message || String(error)}`);
     }
-    
-    return pages;
 }
 
 /**
- * Chunks text while preserving page number information
+ * Chunks text while preserving page number information (Now expects PageText[] structure).
  */
 export function chunkTextWithPages(
   pages: PageText[],
@@ -107,18 +66,18 @@ export function chunkTextWithPages(
 ): { text: string; pageNumbers: number[]; }[] {
   const chunks: { text: string; pageNumbers: number[]; }[] = [];
   
-  // Process each page
+  // Process potentially multiple pages (though pdf-parse currently provides only one)
   pages.forEach(({ pageNumber, text }) => {
+    if (!text) return; // Skip pages with no text
     let i = 0;
     while (i < text.length) {
       const end = Math.min(i + chunkSize, text.length);
       const chunk = text.substring(i, end);
       
-      // Only add non-empty chunks
       if (chunk.trim()) {
         chunks.push({
           text: chunk.trim(),
-          pageNumbers: [pageNumber]
+          pageNumbers: [pageNumber] // Associate with the current page number
         });
       }
       

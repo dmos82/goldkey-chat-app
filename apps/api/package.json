@@ -6,7 +6,7 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "nodemon --watch src --ext ts,json --exec ts-node --transpile-only src/index.ts",
-    "build": "tsup src/index.ts --format cjs --dts --clean --external pdf-parse --external pdfjs-dist",
+    "build": "tsup src/index.ts --format cjs --dts --clean --external pdf-parse",
     "start": "node --preserve-symlinks dist/index.js",
     "load-kb": "ts-node src/scripts/loadSystemKnowledge.ts",
     "lint": "eslint src --ext .ts,.tsx",
@@ -31,7 +31,6 @@
     "morgan": "^1.10.0",
     "multer": "^1.4.5-lts.1",
     "openai": "^4.93.0",
-    "pdfjs-dist": "^4.8.69",
     "winston": "^3.17.0"
   },
   "devDependencies": {
