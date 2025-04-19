@@ -2,11 +2,17 @@
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js');
 
-// Set workerSrc explicitly for Node.js environment if needed
-// This might point to a file within the pdfjs-dist package itself
-// Try resolving the path to ensure it's correct in the runtime environment
-// const workerSrc = require.resolve('pdfjs-dist/legacy/build/pdf.worker.js');
-// pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
+// --- Set Worker Source ---
+try {
+    const workerSrcPath = require.resolve('pdfjs-dist/legacy/build/pdf.worker.js');
+    pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrcPath;
+    console.log(`[pdfUtils] Set pdfjs workerSrc to: ${workerSrcPath}`);
+} catch (error) {
+    console.error("[pdfUtils] Failed to resolve pdf.worker.js path. PDF processing might fail.", error);
+    // Consider making this fatal if PDF processing is essential
+    // throw new Error("Failed to configure PDF worker.");
+}
+// -------------------------
 
 export interface PageText {
     pageNumber: number;
@@ -47,11 +53,8 @@ export async function extractPdfTextWithPages(pdfBuffer: Buffer): Promise<PageTe
     const pages: PageText[] = [];
     // Load the PDF document from the buffer
     const loadingTask = pdfjsLib.getDocument({ 
-        data: new Uint8Array(pdfBuffer), // pdfjs expects Uint8Array
-        // cMapUrl and standardFontDataUrl are less likely needed with legacy build/worker setup
-        // cMapUrl: './node_modules/pdfjs-dist/cmaps/', 
-        // cMapPacked: true, 
-        // standardFontDataUrl: './node_modules/pdfjs-dist/standard_fonts/'
+        data: new Uint8Array(pdfBuffer) // pdfjs expects Uint8Array
+        // No cMapUrl or standardFontDataUrl needed when worker is set correctly
     });
 
     try {
