@@ -41,21 +41,36 @@ router.post('/register', async (req: Request, res: Response): Promise<Response |
     const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
 
     // 4. Create & Save User
-    const newUser = new User({
+    const userDataForSave = {
       username: trimmedUsername,
       password: hashedPassword, // Store the hashed password
-    });
-    await newUser.save();
+    };
+    console.log('[Register Debug] Prepared user data (excluding password): ', { username: userDataForSave.username });
+    console.log('[Register Debug] Attempting to save new user to MongoDB...');
+    
+    try {
+        // Use create instead of new + save for atomicity if possible
+        const user = await User.create(userDataForSave);
+        console.log('[Register Debug] Successfully saved user to MongoDB. User ID:', user._id);
 
-    // 5. Success Response (Do NOT send password hash)
-    res.status(201).json({ 
-      message: 'User registered successfully',
-      userId: newUser._id,
-      username: newUser.username,
-    });
+        // 5. Success Response (Do NOT send password hash)
+        res.status(201).json({ 
+          message: 'User registered successfully',
+          userId: user._id,
+          username: user.username,
+        });
+    } catch (dbError: any) {
+        console.error('[Register Debug] !!! FAILED to save user to MongoDB !!! Error:', dbError);
+        // Send a 400 or 500 error response, not 201
+        const errorMessage = dbError.code === 11000 
+            ? 'Username already exists (database constraint).' 
+            : (dbError.message || 'Database error during registration.');
+        res.status(dbError.code === 11000 ? 409 : 500).json({ error: errorMessage });
+    }
 
   } catch (error) {
-    console.error('Registration Error:', error); // Log the actual error server-side
+    // This outer catch handles errors like hashing failure or findOne failure
+    console.error('[Register] General Registration Error:', error); // Log the actual error server-side
     res.status(500).json({ error: 'Registration failed due to server error' });
   }
 });
