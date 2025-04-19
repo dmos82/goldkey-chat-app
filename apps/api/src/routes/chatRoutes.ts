@@ -146,39 +146,63 @@ router.post('/', async (req: Request, res: Response): Promise<void | Response> =
         
         // --- END HYBRID SEARCH --- 
 
-        // 4. Build Context and Final Sources from Combined Results
+        // 4. Build Context and Final Sources from Combined Results (Prioritize Keyword Matches)
         let context = '';
         const finalSourcesForLlm: any[] = [];
-        const seenDocumentIds = new Set<string>();
+        const addedDocIds = new Set<string>(); // Track added document IDs
 
-        console.log(`[Chat RAG] Building final context from top ${FINAL_CONTEXT_LIMIT} sources...`);
+        console.log(`[Chat RAG] Building final context. Prioritizing ${keywordDocIds.length} keyword matches...`);
+
+        // First pass: Add top chunk from each keyword-matched document
+        const keywordMatchedSourcesToAdd = new Map<string, any>(); // Map to store best chunk per keyword doc
         for (const source of combinedSources) {
-             if (finalSourcesForLlm.length >= FINAL_CONTEXT_LIMIT) {
-                 console.log(`[Chat RAG] Reached final context limit (${FINAL_CONTEXT_LIMIT}).`);
-                 break;
-             }
-             // Deduplicate based on documentId (take the highest-ranked chunk for each doc)
-             if (source.documentId && !seenDocumentIds.has(source.documentId)) {
-                if (source.text) {
-                    context += source.text + '\n\n---\n\n';
-                    finalSourcesForLlm.push(source);
-                    seenDocumentIds.add(source.documentId);
-                     console.log(`[Chat RAG] Added source: ${source.fileName} (DocID: ${source.documentId}, Chunk: ${source.chunkIndex}, Score: ${source.boostedScore.toFixed(4)}, Keyword: ${source.isKeywordMatch})`);
-                } else {
-                     console.warn(`[Chat RAG] Source ${source.fileName} (DocID: ${source.documentId}) has no text content, skipping.`);
+            if (source.documentId && keywordDocIds.includes(source.documentId)) {
+                if (!keywordMatchedSourcesToAdd.has(source.documentId)) {
+                     // Store the first (highest boosted score) chunk encountered for this keyword doc
+                    keywordMatchedSourcesToAdd.set(source.documentId, source);
                 }
-             } else if (!source.documentId && source.fileName !== 'Unknown File' && !seenDocumentIds.has(source.fileName)) {
-                 // Handle legacy system docs without documentId but with filename
-                 if (source.text) {
-                     context += source.text + '\n\n---\n\n';
-                     finalSourcesForLlm.push(source);
-                     seenDocumentIds.add(source.fileName); // Use filename as key for older docs
-                     console.log(`[Chat RAG] Added legacy source: ${source.fileName} (Chunk: ${source.chunkIndex}, Score: ${source.boostedScore.toFixed(4)}, Keyword: ${source.isKeywordMatch})`);
-                 } else {
-                      console.warn(`[Chat RAG] Legacy Source ${source.fileName} has no text content, skipping.`);
-                 }
-             }
+            }
         }
+
+        // Add prioritized keyword matches to final list (up to limit)
+        for (const source of Array.from(keywordMatchedSourcesToAdd.values())) {
+            if (finalSourcesForLlm.length >= FINAL_CONTEXT_LIMIT) break;
+            if (source.text && source.documentId && !addedDocIds.has(source.documentId)) { 
+                finalSourcesForLlm.push(source);
+                addedDocIds.add(source.documentId);
+                console.log(`[Chat RAG Priority] Added Keyword Match: ${source.fileName} (DocID: ${source.documentId}, Chunk: ${source.chunkIndex}, Score: ${source.boostedScore.toFixed(4)})`);
+            } else if (!source.text) {
+                console.warn(`[Chat RAG Priority] Keyword matched source ${source.fileName} has no text, skipping.`);
+            }
+        }
+
+        console.log(`[Chat RAG] Added ${finalSourcesForLlm.length} sources from keyword matches. Filling remaining slots...`);
+
+        // Second pass: Fill remaining slots with best non-keyword-matched semantic results
+        for (const source of combinedSources) {
+            if (finalSourcesForLlm.length >= FINAL_CONTEXT_LIMIT) {
+                console.log(`[Chat RAG] Reached final context limit (${FINAL_CONTEXT_LIMIT}).`);
+                break;
+            }
+            // Add if it has text, has a documentId, and hasn't been added already
+            if (source.text && source.documentId && !addedDocIds.has(source.documentId)) {
+                finalSourcesForLlm.push(source);
+                addedDocIds.add(source.documentId);
+                console.log(`[Chat RAG Fill] Added Semantic Match: ${source.fileName} (DocID: ${source.documentId}, Chunk: ${source.chunkIndex}, Score: ${source.boostedScore.toFixed(4)}, Keyword: ${source.isKeywordMatch})`);
+            } else if (!source.documentId && source.fileName !== 'Unknown File' && !addedDocIds.has(source.fileName)) {
+                 // Handle legacy system docs (if necessary, though less likely now)
+                 if (source.text) {
+                     finalSourcesForLlm.push(source);
+                     addedDocIds.add(source.fileName); // Use filename as key
+                     console.log(`[Chat RAG Fill] Added Legacy Semantic Match: ${source.fileName} (Chunk: ${source.chunkIndex}, Score: ${source.boostedScore.toFixed(4)}, Keyword: ${source.isKeywordMatch})`);
+                 } else {
+                      console.warn(`[Chat RAG Fill] Legacy Source ${source.fileName} has no text content, skipping.`);
+                 }
+            }
+        }
+        
+        // Build context string from the final selected sources
+        context = finalSourcesForLlm.map(s => s.text).join('\n\n---\n\n');
 
         if (!context.trim()) {
             console.log('[Chat RAG] No relevant context found after processing hybrid results.');
