@@ -23,6 +23,7 @@ import authRoutes from './routes/authRoutes'; // <-- Import auth routes
 import searchRoutes from './routes/searchRoutes'; // Import search routes
 import systemKbRoutes from './routes/systemKbRoutes'; // Added: Import system KB routes
 import adminRoutes from './routes/adminRoutes'; // <-- Import admin routes
+import userRoutes from './routes/userRoutes'; // <-- Import user routes
 
 // --- Main Application Setup ---
 const app = express();
@@ -112,6 +113,9 @@ async function startServer() {
 
     // Added: Mount admin routes
     app.use('/api/admin', adminRoutes);
+
+    // Added: Mount user routes
+    app.use('/api/users', userRoutes);
 
     // TODO: Add chat route here later
     // app.use('/api/chat', chatRoutes);
